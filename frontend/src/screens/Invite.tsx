@@ -22,7 +22,6 @@ export default function Invite() {
 
   const inviteText =
     "🪙 ANON EARN — Birr, little by little, every day.\n\n" +
-    "No deposit. No investment. I earn here from my phone:\n" +
     "🎬 clips I watch turn into Birr\n" +
     "🎯 small missions, quick rewards\n" +
     "🔥 a daily streak that keeps paying\n" +
