@@ -117,11 +117,11 @@ if not WEBAPP_URL.startswith(("http://", "https://")):
     WEBAPP_URL = f"https://{WEBAPP_URL}"
 
 BOT_RULES_CAPTION = (
-    "📜 <b>System Terms of Service & Anti-Fraud Policy</b>\n\n"
-    "1. <b>Strict Integrity:</b> Self-referrals or multi-accounting schemes are prohibited.\n"
-    "2. <b>Security Protocols:</b> Use of VPNs, proxy networks, or emulators is banned.\n"
-    "3. <b>Reward Settlement:</b> Rewards are credited after Mini App identity clear.\n"
-    "⚠️ <i>Note: Violations will result in a permanent ban.</i>"
+    "🛡 <b>Anon Earn — Fair Play Rules</b>\n\n"
+    "• One person, one account. No self-invites, no clone accounts.\n"
+    "• No VPN, proxy or emulator while you verify or earn.\n"
+    "• Your rewards unlock after the quick in-app security check.\n"
+    "🚫 <i>Breaking the rules means a permanent ban.</i>"
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2752,7 +2752,7 @@ async def process_start_command(message: Message, state: FSMContext):
         return
 
     if await DataEngine.is_verified(uid):
-        return await message.answer("✅ <b>Welcome back!</b> Choose an option below:", reply_markup=generate_dashboard_matrix(uid))
+        return await message.answer("👋 <b>Good to see you again!</b>\nYour Anon Earn menu is ready — pick what you need:", reply_markup=generate_dashboard_matrix(uid))
 
     # ── Clean up any stale, unfinished verification widget ────────────────
     # If the user restarts the bot (or taps an old shared /start link)
@@ -2815,9 +2815,9 @@ async def process_balance_query(callback: CallbackQuery):
         acc = await DataEngine.get_user(uid)
     min_w = await DataEngine.get_setting("min_withdrawal", "50")
     await callback.message.edit_text(
-        f"💰 <b>Your Available Balance:</b>\n\n"
-        f"• Assets: <code>{float(acc['balance']):.2f} Birr</code>\n"
-        f"• Minimum Withdrawal: <code>{min_w} Birr</code>",
+        f"💰 <b>Your Anon Earn Balance</b>\n\n"
+        f"🏦 Available: <code>{float(acc['balance']):.2f} Birr</code>\n"
+        f"💸 Withdrawals start from <code>{min_w} Birr</code>",
         reply_markup=generate_fallback_navigation()
     )
 
@@ -2832,11 +2832,11 @@ async def process_referral_query(callback: CallbackQuery):
     me           = await bot.get_me()
     link         = f"https://t.me/{me.username}?start={uid}"
     await callback.message.edit_text(
-        f"👥 <b>Your Referral Network:</b>\n\n"
-        f"• Total Referrals: <b>{direct} users</b>\n"
-        f"• Earnings per Referral: <b>{rate:.2f} Birr</b>\n"
-        f"• Total Earned: <b>{direct * rate:.2f} Birr</b>\n\n"
-        f"🔗 Your link:\n<code>{link}</code>",
+        f"👥 <b>Your Team</b>\n\n"
+        f"🙋 People you invited: <b>{direct}</b>\n"
+        f"🎁 You earn: <b>{rate:.2f} Birr</b> per person\n"
+        f"💵 Team earnings so far: <b>{direct * rate:.2f} Birr</b>\n\n"
+        f"🔗 Your invite link:\n<code>{link}</code>",
         reply_markup=generate_fallback_navigation()
     )
 
@@ -2857,10 +2857,10 @@ async def process_link_generation(callback: CallbackQuery):
         [InlineKeyboardButton(text="🔙 Back", callback_data="ui_return_home")],
     ]
     await callback.message.edit_text(
-        f"🔗 <b>Your Invite Link:</b>\n\n"
+        f"🔗 <b>Grow your team, grow your balance</b>\n\n"
         f"<code>{link}</code>\n\n"
-        f"💰 You earn <b>{rate:.2f} Birr</b> per invite.\n"
-        f"👇 Tap <b>Share</b> to send your invite to friends.",
+        f"Every friend who joins and verifies puts <b>{rate:.2f} Birr</b> in your balance.\n"
+        f"👇 Hit <b>Share</b> and send it to your friends.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=rows)
     )
 
@@ -3322,7 +3322,7 @@ async def process_withdrawal_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(UserWithdrawalWorkflow.select_payout_gateway)
     await state.update_data(cached_balance=current_bal, cached_minimum=min_w)
     await callback.message.edit_text(
-        "💸 <b>Select Payout Endpoint:</b>",
+        "💸 <b>How do you want your money?</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📲 Telebirr", callback_data="gateway_telebirr")],
             [InlineKeyboardButton(text="🟡 Binance Pay", callback_data="gateway_binance")],
@@ -3335,7 +3335,7 @@ async def process_telebirr_selection(callback: CallbackQuery, state: FSMContext)
     await state.update_data(gateway="telebirr")
     await state.set_state(UserWithdrawalWorkflow.input_cash_volume)
     await callback.message.edit_text(
-        "<b>Specify the amount you wish to withdraw (Birr):</b>",
+        "<b>How much do you want to withdraw? (Birr)</b>",
         reply_markup=generate_fallback_navigation()
     )
 
@@ -3345,7 +3345,7 @@ async def process_binance_selection(callback: CallbackQuery, state: FSMContext):
     await state.set_state(UserWithdrawalWorkflow.input_cash_volume)
     usdt_rate = float(await DataEngine.get_setting("usdt_rate", "155"))
     await callback.message.edit_text(
-        f"<b>Specify the amount you wish to withdraw (Birr):</b>\n\n"
+        f"<b>How much do you want to withdraw? (Birr)</b>\n\n"
         f"💱 Rate: 1 USDT ≈ {usdt_rate:.2f} Birr",
         reply_markup=generate_fallback_navigation()
     )
@@ -3357,13 +3357,13 @@ async def process_cashout_volume(message: Message, state: FSMContext):
         val = round(float(message.text.strip()), 2)
         if val < s["cached_minimum"] or val > s["cached_balance"]:
             return await message.answer(
-                f"❌ Invalid amount. Minimum withdrawal is {s['cached_minimum']:.2f} ETB.\n"
-                f"⚠️ <b>Your balance is:</b> {s['cached_balance']:.2f} ETB."
+                f"❌ That amount doesn't work. The minimum is {s['cached_minimum']:.2f} Birr.\n"
+                f"Your balance: <b>{s['cached_balance']:.2f} Birr</b>."
             )
     except Exception:
         return await message.answer(
-            f"❌ Please enter a valid number.\n"
-            f"⚠️ <b>Your balance is:</b> {s['cached_balance']:.2f} ETB."
+            f"❌ Please send a number only.\n"
+            f"Your balance: <b>{s['cached_balance']:.2f} Birr</b>."
         )
     await state.update_data(validated_volume=val)
     if s.get("gateway") == "binance":
@@ -3372,38 +3372,38 @@ async def process_cashout_volume(message: Message, state: FSMContext):
         await state.set_state(UserWithdrawalWorkflow.provide_binance_uid)
         await message.answer(
             f"💱 <b>≈ {usdt_amount:.2f} USDT</b> at the current rate.\n\n"
-            f"🆔 <b>Provide your Binance UID:</b>"
+            f"🆔 <b>Send your Binance UID:</b>"
         )
     else:
         await state.set_state(UserWithdrawalWorkflow.provide_mobile_digits)
-        await message.answer("📱 <b>Provide Destination Account Mobile Number:</b>")
+        await message.answer("📱 <b>Send the Telebirr number that should receive the money:</b>")
 
 @core_router.message(UserWithdrawalWorkflow.provide_mobile_digits)
 async def process_mobile_digits(message: Message, state: FSMContext):
     phone = message.text.strip()
     if len(phone) < 9:
-        return await message.answer("❌ Provide a valid mobile number.")
+        return await message.answer("❌ That doesn't look like a valid phone number — try again.")
     await state.update_data(validated_phone=phone)
     await state.set_state(UserWithdrawalWorkflow.provide_account_title)
-    await message.answer("📝 <b>Enter Full Name of Account Holder:</b>")
+    await message.answer("📝 <b>Send the full name on that Telebirr account:</b>")
 
 @core_router.message(UserWithdrawalWorkflow.provide_account_title)
 async def process_account_title(message: Message, state: FSMContext):
     title = message.text.strip()
     if len(title) < 3:
-        return await message.answer("❌ Name is too short.")
+        return await message.answer("❌ That name is too short — send the full name.")
     await state.update_data(validated_title=title)
     s = await state.get_data()
     safe_title = sanitize_html(title)
     await message.answer(
-        f"⚠️ <b>Review Settlement Details</b>\n\n"
+        f"🧾 <b>Check your payout details</b>\n\n"
         f"• Platform: <code>Telebirr</code>\n"
         f"• Amount: <code>{s['validated_volume']:.2f} ETB</code>\n"
         f"• Holder: <code>{safe_title}</code>\n"
         f"• Number: <code>{sanitize_html(s['validated_phone'])}</code>\n\n"
         f"Authorization requested.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Transact Payout",  callback_data="action_payout_dispatch"),
+            InlineKeyboardButton(text="✅ Yes, Send My Money",  callback_data="action_payout_dispatch"),
             InlineKeyboardButton(text="❌ Abort",     callback_data="ui_return_home"),
         ]])
     )
@@ -3413,19 +3413,19 @@ async def process_account_title(message: Message, state: FSMContext):
 async def process_binance_uid(message: Message, state: FSMContext):
     binance_uid = message.text.strip()
     if len(binance_uid) < 5:
-        return await message.answer("❌ Provide a valid Binance UID.")
+        return await message.answer("❌ That Binance UID doesn't look right — try again.")
     await state.update_data(validated_binance_uid=binance_uid)
     s = await state.get_data()
     usdt_rate = float(await DataEngine.get_setting("usdt_rate", "155"))
     usdt_amount = s["validated_volume"] / usdt_rate if usdt_rate > 0 else 0
     await message.answer(
-        f"⚠️ <b>Review Settlement Details</b>\n\n"
+        f"🧾 <b>Check your payout details</b>\n\n"
         f"• Platform: <code>Binance Pay</code>\n"
         f"• Amount: <code>{s['validated_volume']:.2f} ETB</code> (≈ {usdt_amount:.2f} USDT)\n"
         f"• Binance UID: <code>{sanitize_html(binance_uid)}</code>\n\n"
         f"Authorization requested.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Transact Payout",  callback_data="action_payout_dispatch"),
+            InlineKeyboardButton(text="✅ Yes, Send My Money",  callback_data="action_payout_dispatch"),
             InlineKeyboardButton(text="❌ Abort",     callback_data="ui_return_home"),
         ]])
     )
@@ -3591,7 +3591,7 @@ async def process_payout_dispatch(callback: CallbackQuery, state: FSMContext):
         return await callback.answer(reason, show_alert=True)
 
     await state.clear()
-    _submitted_txt = f"📨 <b>Withdrawal Submitted!</b> Processing within {await get_withdrawal_process_text()}."
+    _submitted_txt = f"✅ <b>Request received!</b> Your money is on its way — processing within {await get_withdrawal_process_text()}."
     await callback.message.edit_text(
         _submitted_txt,
         reply_markup=generate_dashboard_matrix(uid)
@@ -3824,7 +3824,7 @@ async def approve_withdrawal_core(tid: int, notify_mode: str = "both") -> dict:
             method_txt = "Binance Pay" if is_binance else "Telebirr"
             await bot.send_message(
                 ticket["user_id"],
-                f"🎉 Your cashout of {ticket['amount']:.2f} Birr has been approved and sent via {method_txt}!"
+                f"🎉 <b>Paid!</b> Your {ticket['amount']:.2f} Birr cashout was approved and sent via {method_txt}. Enjoy!"
             )
         except Exception:
             pass
@@ -3952,12 +3952,11 @@ async def execute_withdrawal_rejection(msg_obj, tid, ticket, reason):
             await db.execute("ROLLBACK")
             raise
     warning_notice = (
-        f"❌ <b>Your Withdrawal Request has been Rejected!</b>\n\n"
+        f"❌ <b>Your payout was not approved</b>\n\n"
         f"💰 <b>Amount:</b> <code>{ticket['amount']:.2f} Birr</code>\n"
         f"⚠️ <b>Reason:</b> <code>{sanitize_html(reason)}</code>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 <b>IMPORTANT NOTICE:</b>\n"
-        f"🇬🇧 Please invite real, organic, and active users.\n\n"
+        f"📢 <b>Please note:</b> Only invite real, active people — fake invites put your account at risk.\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━"
     )
     try:
@@ -5042,22 +5041,9 @@ async def api_recent_withdrawals():
         except Exception:
             pass
 
-    default_eth = [
-        {"full_name": "Ekram", "amount": 380.0, "status": "approved"},
-        {"full_name": "Abebe", "amount": 250.0, "status": "approved"},
-        {"full_name": "Kebede", "amount": 420.0, "status": "approved"},
-        {"full_name": "Tigist", "amount": 300.0, "status": "approved"},
-        {"full_name": "Mulugeta", "amount": 500.0, "status": "approved"},
-        {"full_name": "Beti", "amount": 180.0, "status": "approved"},
-        {"full_name": "Haile", "amount": 450.0, "status": "approved"},
-        {"full_name": "Selam", "amount": 320.0, "status": "approved"},
-        {"full_name": "Yohannes", "amount": 600.0, "status": "approved"},
-        {"full_name": "Meron", "amount": 280.0, "status": "approved"},
-        {"full_name": "Ermias", "amount": 350.0, "status": "approved"},
-        {"full_name": "Genet", "amount": 410.0, "status": "approved"},
-    ]
-
-    combined = real_list + custom_list + default_eth
+    # No built-in names: the ticker shows ONLY names the admin adds
+    # (ticker_custom_names). With none configured it stays empty.
+    combined = real_list + custom_list
     return {"enabled": True, "withdrawals": combined}
 
 @api_app.get("/health")
