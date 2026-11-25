@@ -2659,12 +2659,11 @@ async def enforce_membership_gate(event, user_id: int) -> bool:
     buttons = []
     for ch in unjoined:
         buttons.append([InlineKeyboardButton(text=f"➕ Join: {ch['channel_name']}", url=ch["invite_link"])])
-    buttons.append([InlineKeyboardButton(text="✅ Joined / ተቀላቅያለሁ", callback_data="ui_revalidate_channels")])
+    buttons.append([InlineKeyboardButton(text="✅ Joined", callback_data="ui_revalidate_channels")])
 
     txt = (
         "👋 <b>Welcome!</b>\n\n"
-        "እባክዎ ከታች ያሉትን ሁሉንም ቻናሎች ይቀላቀሉ፣ ከዚያም <b>'Joined'</b> የሚለውን በተን ይጫኑ።\n\n"
-        "Please join all channels and continue."
+        "Please join all the channels below, then tap <b>'Joined'</b>."
     )
 
     if isinstance(event, Message):
@@ -2790,7 +2789,7 @@ async def process_navigation_home(callback: CallbackQuery, state: FSMContext):
         if not await enforce_membership_gate(callback, uid):
             return
     await callback.message.edit_text(
-        "🏠 <b>Main Dashboard Menu / ዋና ማውጫ</b>",
+        "🏠 <b>Main Menu</b>",
         reply_markup=generate_dashboard_matrix(uid)
     )
 
@@ -2855,7 +2854,7 @@ async def process_link_generation(callback: CallbackQuery):
     )
     rows = [
         [InlineKeyboardButton(text=SHARE_BTN_TEXT, url=share_url)],
-        [InlineKeyboardButton(text="🔙 Back / ተመለስ", callback_data="ui_return_home")],
+        [InlineKeyboardButton(text="🔙 Back", callback_data="ui_return_home")],
     ]
     await callback.message.edit_text(
         f"🔗 <b>Your Invite Link:</b>\n\n"
@@ -3177,13 +3176,13 @@ def generate_verification_widget(user_id: int, ref: int, msg_id: int = 0):
     # from this backend, so this must point at FRONTEND_URL, not WEBAPP_URL.
     url = f"{WEBAPP_URL}/verify?uid={user_id}&ref={ref}&msg_id={msg_id}"
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🚀 Start Verification / ጀምር", web_app=WebAppInfo(url=url))
+        InlineKeyboardButton(text="🚀 Start Verification", web_app=WebAppInfo(url=url))
     ]])
 
 def generate_app_webapp_button(user_id: int, admin: bool = False) -> InlineKeyboardMarkup:
     url = f"{FRONTEND_URL}/app.html?uid={user_id}" + ("&admin=1" if admin else "")
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="📱 Open Mini App / አፑን ክፈት", web_app=WebAppInfo(url=url))
+        InlineKeyboardButton(text="📱 Open Anon Earn", web_app=WebAppInfo(url=url))
     ]])
 
 def build_invite_share_url(user_id: int) -> str | None:
@@ -3211,7 +3210,7 @@ def build_invite_share_url(user_id: int) -> str | None:
 # Share button label: plain circular-arrow glyph instead of an emoji.
 # Change this one constant to swap the symbol everywhere.
 SHARE_ARROW = "↻"
-SHARE_BTN_TEXT = f"{SHARE_ARROW} Share / አጋራ"
+SHARE_BTN_TEXT = f"{SHARE_ARROW} Share"
 
 async def get_withdrawal_process_text() -> str:
     """Admin-editable processing time, e.g. '24-48 hours' or '3 days'."""
@@ -3222,26 +3221,26 @@ async def get_withdrawal_process_text() -> str:
     return f"{val} {unit}"
 
 def generate_dashboard_matrix(user_id: int) -> InlineKeyboardMarkup:
-    # Share is NOT on the main menu — it appears only after tapping My Link.
-    # Layout:  [        Open Mini App        ]   <- full width
-    #          [ Balance ]  [ Referrals ]         <- 2 columns
-    #          [ My Link ]  [ Withdraw  ]         <- 2 columns
+    # Anon Earn's own menu style (not the legacy layout): earn actions first.
+    # Layout:  [        Open Anon Earn        ]   <- full width
+    #          [ Balance ]  [ Withdraw ]          <- money row
+    #          [  Team   ]  [ Invite Link ]       <- growth row
     rows = [
         [InlineKeyboardButton(
-            text="📱 Open Mini App / አፑን ክፈት",
+            text="🚀 Open Anon Earn",
             web_app=WebAppInfo(url=f"{FRONTEND_URL}/app.html?uid={user_id}")
         )],
         [
-            InlineKeyboardButton(text="💰 Balance / ሒሳብ",    callback_data="ui_fetch_balance"),
-            InlineKeyboardButton(text="👥 Referrals / ጋባዦች", callback_data="ui_fetch_referrals"),
+            InlineKeyboardButton(text="💰 Balance",  callback_data="ui_fetch_balance"),
+            InlineKeyboardButton(text="💸 Withdraw", callback_data="ui_initiate_withdrawal"),
         ],
         [
-            InlineKeyboardButton(text="🔗 My Link / ሊንኬ",       callback_data="ui_fetch_link"),
-            InlineKeyboardButton(text="💸 Withdraw / ብር ማውጫ", callback_data="ui_initiate_withdrawal"),
+            InlineKeyboardButton(text="👥 Team",        callback_data="ui_fetch_referrals"),
+            InlineKeyboardButton(text="🔗 Invite Link", callback_data="ui_fetch_link"),
         ],
     ]
     if evaluate_admin_access(user_id):
-        rows.append([InlineKeyboardButton(text="⚙️ Admin Control Center", callback_data="ui_admin_core")])
+        rows.append([InlineKeyboardButton(text="🛠 Admin Panel", callback_data="ui_admin_core")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def generate_admin_dashboard() -> InlineKeyboardMarkup:
@@ -3286,7 +3285,7 @@ def generate_admin_dashboard() -> InlineKeyboardMarkup:
 
 def generate_fallback_navigation(target="ui_return_home") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🔙 Back / ተመለስ", callback_data=target)
+        InlineKeyboardButton(text="🔙 Back", callback_data=target)
     ]])
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3325,9 +3324,9 @@ async def process_withdrawal_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         "💸 <b>Select Payout Endpoint:</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📲 Telebirr / ቴሌብር", callback_data="gateway_telebirr")],
+            [InlineKeyboardButton(text="📲 Telebirr", callback_data="gateway_telebirr")],
             [InlineKeyboardButton(text="🟡 Binance Pay", callback_data="gateway_binance")],
-            [InlineKeyboardButton(text="❌ Cancel / ሰርዝ",     callback_data="ui_return_home")],
+            [InlineKeyboardButton(text="❌ Cancel",     callback_data="ui_return_home")],
         ])
     )
 
@@ -3405,7 +3404,7 @@ async def process_account_title(message: Message, state: FSMContext):
         f"Authorization requested.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="✅ Transact Payout",  callback_data="action_payout_dispatch"),
-            InlineKeyboardButton(text="❌ Abort / ሰርዝ",     callback_data="ui_return_home"),
+            InlineKeyboardButton(text="❌ Abort",     callback_data="ui_return_home"),
         ]])
     )
     await state.set_state(UserWithdrawalWorkflow.payout_final_approval)
@@ -3427,7 +3426,7 @@ async def process_binance_uid(message: Message, state: FSMContext):
         f"Authorization requested.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="✅ Transact Payout",  callback_data="action_payout_dispatch"),
-            InlineKeyboardButton(text="❌ Abort / ሰርዝ",     callback_data="ui_return_home"),
+            InlineKeyboardButton(text="❌ Abort",     callback_data="ui_return_home"),
         ]])
     )
     await state.set_state(UserWithdrawalWorkflow.payout_final_approval)
@@ -3439,7 +3438,7 @@ def build_payout_admin_markup(tid: int, uid: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Approve (Both)",  callback_data=f"adm_payout_apask_both_{tid}")],
         [InlineKeyboardButton(text="📢 Approve (Channel Only)", callback_data=f"adm_payout_apask_co_{tid}")],
-        [InlineKeyboardButton(text="❌ Deny (ውድቅ አድርግ)", callback_data=f"adm_payout_rjmenu_{tid}")],
+        [InlineKeyboardButton(text="❌ Deny", callback_data=f"adm_payout_rjmenu_{tid}")],
         [InlineKeyboardButton(text="👥 View Referrals", callback_data=f"adm_view_invites_{uid}")]
     ])
 
@@ -3540,8 +3539,8 @@ async def dispatch_withdrawal_core(
         f"💰 <b>Amount:</b> <b>{amount:.2f} Birr</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 <b>NETWORK INTEGRITY REPORT:</b>\n"
-        f"• Direct Referrals: <b>{direct_ref} ሰዎችን</b>\n"
-        f"• Tier-2 Network Activity: <b>{tier2_ref} ሰዎችን</b>"
+        f"• Direct Referrals: <b>{direct_ref} people</b>\n"
+        f"• Tier-2 Network Activity: <b>{tier2_ref} people</b>"
     )
     # Admin alert routing:
     #   "both" (default) -> ticket is sent to the admin's bot chat AND is in the Mini App
@@ -3582,7 +3581,7 @@ async def process_payout_dispatch(callback: CallbackQuery, state: FSMContext):
                 f"{reason}\n\n👇 <b>Tap below to open the Mini App and watch your required ads:</b>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="🎬 Watch Ads in Mini App", web_app=WebAppInfo(url=f"{FRONTEND_URL}/app.html?uid={uid}"))],
-                    [InlineKeyboardButton(text="🔙 Back / ተመለስ", callback_data="ui_return_home")]
+                    [InlineKeyboardButton(text="🔙 Back", callback_data="ui_return_home")]
                 ])
             )
         if reason == "insufficient_funds":
@@ -3745,7 +3744,7 @@ async def render_fraud_log_page(callback: CallbackQuery, page: int):
         f"⚠️ <b>Fraud Log</b> — page {page + 1}/{pages} ({total} total)\n\n" + "\n\n".join(lines),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             nav,
-            [InlineKeyboardButton(text="🔙 Back / ተመለስ", callback_data="ui_admin_core")],
+            [InlineKeyboardButton(text="🔙 Back", callback_data="ui_admin_core")],
         ])
     )
 
@@ -3959,7 +3958,6 @@ async def execute_withdrawal_rejection(msg_obj, tid, ticket, reason):
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📢 <b>IMPORTANT NOTICE:</b>\n"
         f"🇬🇧 Please invite real, organic, and active users.\n\n"
-        f"🇪🇹 እባክዎ እውነተኛ ተጠቃሚዎችን ብቻ ይጋብዙ።\n"
         f"━━━━━━━━━━━━━━━━━━━━━━"
     )
     try:
@@ -4136,7 +4134,7 @@ async def process_add_noadmin_start(callback: CallbackQuery, state: FSMContext):
     if not evaluate_admin_access(callback.from_user.id): return
     await state.set_state(AdminConsoleWorkflow.append_noadmin_link)
     await callback.message.edit_text(
-        "🟡 <b>Fake Join (No Admin Required)</b>\n\nየቻናሉን ሊንክ አስገባ:",
+        "🟡 <b>Fake Join (No Admin Required)</b>\n\nSend the channel link:",
         reply_markup=generate_fallback_navigation("ui_admin_core")
     )
 
@@ -4154,7 +4152,7 @@ async def process_noadmin_title(message: Message, state: FSMContext):
     await DataEngine.add_force_channel(
         channel_id=fake_key, channel_name=message.text.strip(), invite_link=s["na_link"], bot_added=1
     )
-    await message.answer(f"✅ <b>Fake ቻናል ተጨምሯል!</b>\n📌 {sanitize_html(message.text.strip())}", reply_markup=generate_admin_dashboard())
+    await message.answer(f"✅ <b>Fake channel added!</b>\n📌 {sanitize_html(message.text.strip())}", reply_markup=generate_admin_dashboard())
 
 @core_router.callback_query(F.data == "adm_cmd_list_channels")
 async def process_list_channels(callback: CallbackQuery):
@@ -4398,12 +4396,12 @@ BOT_ID: int = 0
 async def stop_bot_first_confirmation(callback: CallbackQuery):
     if not evaluate_admin_access(callback.from_user.id): return
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⚠️ ኃላፊነቱን እወስዳለሁ - ቀጥል", callback_data="adm_stop_bot_confirm2")],
-        [InlineKeyboardButton(text="❌ አቁም/ተመለስ",               callback_data="ui_admin_core")],
+        [InlineKeyboardButton(text="⚠️ I take responsibility — continue", callback_data="adm_stop_bot_confirm2")],
+        [InlineKeyboardButton(text="❌ Cancel / Back",               callback_data="ui_admin_core")],
     ])
     await callback.message.edit_text(
         "🚨 <b>FIRST WARNING!</b>\n\n"
-        "ቦቱን ማቆም ከፈለጉ እርግጠኛ ነዎት? (ይህ የ chat polling ብቻ ያቆማል — መረጃ/ሒሳብ አይጠፋም)",
+        "Are you sure you want to stop the bot? (This only stops chat polling — data and balances are NOT deleted)",
         reply_markup=markup
     )
 
@@ -4411,8 +4409,8 @@ async def stop_bot_first_confirmation(callback: CallbackQuery):
 async def stop_bot_final_confirmation(callback: CallbackQuery):
     if not evaluate_admin_access(callback.from_user.id): return
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🛑 አሁኑኑ ቦቱ ይቁም!", callback_data="adm_stop_bot_execute")],
-        [InlineKeyboardButton(text="❌ ተመለስ",          callback_data="ui_admin_core")],
+        [InlineKeyboardButton(text="🛑 Stop the bot now!", callback_data="adm_stop_bot_execute")],
+        [InlineKeyboardButton(text="❌ Back",          callback_data="ui_admin_core")],
     ])
     await callback.message.edit_text("🛑 <b>FINAL CONFIRMATION!</b>", reply_markup=markup)
 
@@ -4424,7 +4422,7 @@ async def execute_bot_shutdown(callback: CallbackQuery):
         "✅ All data, balances, and Mini App verification are safe and untouched.\n"
         "▶️ Tap below to resume any time.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="▶️ Resume Polling / ቀጥል", callback_data="adm_resume_bot_execute")
+            InlineKeyboardButton(text="▶️ Resume Polling", callback_data="adm_resume_bot_execute")
         ]])
     )
     # BUG-REPORT #6: this used to call dp.stop_polling() — but a stopped
@@ -5466,8 +5464,8 @@ async def api_ads_status(body: ApiBase):
 
     reminder_enabled   = (await DataEngine.get_setting("ad_click_reminder_enabled", "1")) == "1"
     reminder_disguised = (await DataEngine.get_setting("ad_click_reminder_disguised", "0")) == "1"
-    reminder_text      = await DataEngine.get_setting("ad_click_reminder_text", "ማስታወቂያው ሳይዘጋ እስከሚጨርስ ድረስ ይጠብቁ")
-    reminder_disguise_text = await DataEngine.get_setting("ad_click_reminder_disguise_text", "⚠️ ማስተወቂያውን መንካት አለብዎት! ሪዋርድ ለማግኘት ማስተወቂያው ላይ ክሊክ ማድረግ አለብዎት።")
+    reminder_text      = await DataEngine.get_setting("ad_click_reminder_text", "Please wait until the ad finishes — do not close it early")
+    reminder_disguise_text = await DataEngine.get_setting("ad_click_reminder_disguise_text", "⚠️ Please tap the ad! You must click the ad to earn your reward.")
     reminder_network_text  = await DataEngine.get_setting("ad_click_reminder_network_text", "⚠️ Network error. Please try again.")
     require_banner_click   = (await DataEngine.get_setting("ad_require_banner_click", "0")) == "1"
 
@@ -6518,14 +6516,14 @@ async def api_admin_tasks_broadcast(body: AdminTaskBroadcastRequest):
     if not task:
         raise HTTPException(status_code=404, detail="task_not_found")
     text = (
-        f"🆕 <b>አዲስ ታስክ አለ! / New Task Available!</b>\n\n"
+        f"🆕 <b>New Task Available!</b>\n\n"
         f"📢 {sanitize_html(task['title'])}\n"
         f"💰 Reward: <b>{float(task['reward']):.2f} Birr</b>\n\n"
-        f"👇 ገብታችሁ ስሩ! / Open the app and complete it now."
+        f"👇 Open the app and complete it now."
     )
     markup = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="🚀 Open App / አፑን ክፈት",
+            text="🚀 Open App",
             web_app=WebAppInfo(url=f"{FRONTEND_URL}/app.html"),
         )
     ]])
@@ -6735,10 +6733,10 @@ async def api_admin_settings(body: ApiBase):
         "ad_click_reminder_enabled": (await DataEngine.get_setting("ad_click_reminder_enabled", "1")) == "1",
         "ad_click_reminder_disguised": (await DataEngine.get_setting("ad_click_reminder_disguised", "0")) == "1",
         "ad_click_reminder_text": await DataEngine.get_setting(
-            "ad_click_reminder_text", "ማስታወቂያው ሳይዘጋ እስከሚጨርስ ድረስ ይጠብቁ"
+            "ad_click_reminder_text", "Please wait until the ad finishes — do not close it early"
         ),
         "ad_click_reminder_disguise_text": await DataEngine.get_setting(
-            "ad_click_reminder_disguise_text", "⚠️ ማስተወቂያውን መንካት አለብዎት! ሪዋርድ ለማግኘት ማስተወቂያው ላይ ክሊክ ማድረግ አለብዎት።"
+            "ad_click_reminder_disguise_text", "⚠️ Please tap the ad! You must click the ad to earn your reward."
         ),
         "ad_click_reminder_network_text": await DataEngine.get_setting(
             "ad_click_reminder_network_text", "⚠️ Network error. Please try again."
@@ -6807,8 +6805,8 @@ class AdminSettingsUpdateRequest(ApiBase):
     ticker_custom_names: str | None = None
     ad_click_reminder_enabled: bool = True
     ad_click_reminder_disguised: bool = False
-    ad_click_reminder_text: str = "ማስታወቂያው ሳይዘጋ እስከሚጨርስ ድረስ ይጠብቁ"
-    ad_click_reminder_disguise_text: str = "⚠️ ማስተወቂያውን መንካት አለብዎት! ሪዋርድ ለማግኘት ማስተወቂያው ላይ ክሊክ ማድረግ አለብዎት።"
+    ad_click_reminder_text: str = "Please wait until the ad finishes — do not close it early"
+    ad_click_reminder_disguise_text: str = "⚠️ Please tap the ad! You must click the ad to earn your reward."
     ad_click_reminder_network_text: str = "⚠️ Network error. Please try again."
     ad_require_banner_click: bool = False
     ad_banner_click_window_seconds: int = 120
@@ -6865,8 +6863,8 @@ async def api_admin_settings_update(body: AdminSettingsUpdateRequest):
         await DataEngine.set_setting("ticker_custom_names", body.ticker_custom_names)
     await DataEngine.set_setting("ad_click_reminder_enabled", "1" if body.ad_click_reminder_enabled else "0")
     await DataEngine.set_setting("ad_click_reminder_disguised", "1" if body.ad_click_reminder_disguised else "0")
-    await DataEngine.set_setting("ad_click_reminder_text", body.ad_click_reminder_text.strip() or "ማስታወቂያው ሳይዘጋ እስከሚጨርስ ድረስ ይጠብቁ")
-    await DataEngine.set_setting("ad_click_reminder_disguise_text", body.ad_click_reminder_disguise_text.strip() or "⚠️ ማስተወቂያውን መንካት አለብዎት! ሪዋርድ ለማግኘት ማስተወቂያው ላይ ክሊክ ማድረግ አለብዎት።")
+    await DataEngine.set_setting("ad_click_reminder_text", body.ad_click_reminder_text.strip() or "Please wait until the ad finishes — do not close it early")
+    await DataEngine.set_setting("ad_click_reminder_disguise_text", body.ad_click_reminder_disguise_text.strip() or "⚠️ Please tap the ad! You must click the ad to earn your reward.")
     await DataEngine.set_setting("ad_click_reminder_network_text", body.ad_click_reminder_network_text.strip() or "⚠️ Network error. Please try again.")
     await DataEngine.set_setting("ad_require_banner_click", "1" if body.ad_require_banner_click else "0")
     await DataEngine.set_setting("ad_banner_click_window_seconds", str(max(10, body.ad_banner_click_window_seconds)))

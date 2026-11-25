@@ -185,7 +185,7 @@ body::after{
     </svg>
   </div>
   <div class="title" id="ttl">Security Check</div>
-  <div class="sub"   id="sub">Verifying in the background… / ከጀርባ በመረጋገጥ ላይ…</div>
+  <div class="sub"   id="sub">Verifying in the background…</div>
   <div class="bar-track"><div class="bar-fill" id="bar"></div></div>
   <div class="steps">
     <div class="step active" id="s1">
@@ -214,7 +214,7 @@ body::after{
     </div>
   </div>
   <div class="pill" id="pill"></div>
-  <button class="retry-btn" id="retryBtn" onclick="location.reload()">🔄 እንደገና ይሞክሩ / Retry</button>
+  <button class="retry-btn" id="retryBtn" onclick="location.reload()">🔄 Retry</button>
   <a class="tg-btn" id="openInTgBtn" href="#" target="_blank">📲 Open in Telegram</a>
 </div>
 
@@ -319,35 +319,35 @@ function showErr(reason, allowRetry, detail){
   const msgs = {
     not_telegram: {
       t:"Open in Telegram", s:"This only works inside Telegram.",
-      b:"✈️ <strong>ይሄ ገጽ የሚሰራው በ Telegram ውስጥ ብቻ ነው።</strong><br>ይመስላል ከ Telegram ውጭ (ለምሳሌ መደበኛ browser) ከፍተውታል። ከታች ያለውን ቁልፍ በመጫን ወደ ቦቱ ይመለሱ።"
+      b:"✈️ <strong>This page only works inside Telegram.</strong><br>It looks like you opened it in a regular browser. Tap the button below to return to the bot."
     },
     vpn: {
       t:"VPN Detected", s:"Please disable VPN and try again.",
-      b:"🔒 <strong>እባክዎ VPN ያጥፉ!</strong><br>VPN ግንኙነት ስለተገኘ ማለፍ አልተቻለም።<br>VPN <strong>Disconnect</strong> አድርገው እንደገና ይሞክሩ።"
+      b:"🔒 <strong>Please turn off your VPN!</strong><br>A VPN connection was detected, so verification cannot continue.<br>Disconnect your VPN and try again."
     },
     cooldown: {
       t:"Please Wait", s:"Too many attempts from this network.",
-      b:"⚠️ <strong>እባክዎ ለማጭበርበር አይሞክሩ!</strong><br>payout request ላይ የእርስዎ መረጃ ስለሚታይ የመከልከል ምክንያት ሊሆኑብዎት ይችላል ስለዚህ ትክክለኛ ሰዉ በመጋበዝ ገንዘብ ይስሩ ይጠንቀቁ ።"
+      b:"⚠️ <strong>Too many attempts from this network.</strong><br>Please wait a few minutes and try again. Payout requests are reviewed against this data — invite real people and play fair."
     },
     device_retry: {
       t:"Couldn't Verify", s:"We couldn't check your device — please retry.",
-      b:"⚠️ <strong>ማረጋገጥ አልተቻለም።</strong><br>እባክዎ app ዝግተው/ከፍተው እንደገና ይሞክሩ። ችግሩ ከቀጠለ admin ያነጋግሩ።"
+      b:"⚠️ <strong>We couldn't verify your device.</strong><br>Please close and reopen the app and try again. If the problem continues, contact the admin."
     },
     self: {
       t:"Verification Failed", s:"Self-invite is not allowed.",
-      b:"⚠️ <strong>ራስን መጋበዝ አይፈቀድም።</strong><br>ይሄ ሊንክ ስራ ላይ የሚውለው ሌላ ሰው ሲጠቀምበት ብቻ ነው። ስህተት ይመስልዎታል ካለ admin ያነጋግሩ።"
+      b:"⚠️ <strong>Self-invite is not allowed.</strong><br>This link only works when someone else uses it. If you think this is a mistake, contact the admin."
     },
     multi: {
       t:"Verification Failed", s:"This device/account looks like a duplicate.",
-      b:"⚠️ <strong>ይሄ መሣሪያ/አካውንት ቀደም ሲል ጥቅም ላይ ውሏል።</strong><br>ስህተት ይመስልዎታል ብለው ካመኑ admin ያነጋግሩ — በማረጋገጥ ይታያል።"
+      b:"⚠️ <strong>This device/account was already used.</strong><br>If you believe this is a mistake, contact the admin — it will be checked during verification."
     },
     network: {
       t:"Error", s:"Please try again.",
-      b:"⚠️ <strong>ስህተት ተፈጥሯል።</strong><br>እባክዎ ትንሽ ቆይተው Retry ይጫኑ።"
+      b:"⚠️ <strong>Something went wrong.</strong><br>Please wait a moment and tap Retry."
     },
     server_error: {
       t:"Error", s:"Please try again.",
-      b:"⚠️ <strong>ስህተት ተፈጥሯል።</strong><br>እባክዎ ትንሽ ቆይተው Retry ይጫኑ።"
+      b:"⚠️ <strong>Something went wrong.</strong><br>Please wait a moment and tap Retry."
     },
   };
   const m = msgs[category] || msgs.device_retry;
