@@ -5990,6 +5990,41 @@ class TaskActionRequest(ApiBase):
     task_id: int
 
 
+async def _force_membership_ok(task, uid) -> str:
+    """REAL membership verdict for a 'force' task: 'ok', 'not_member' or
+    'check_failed'. Callers fail CLOSED on anything but 'ok' — a force
+    reward is only paid to a proven member. (Owner report 2026-11-26:
+    the old fail-open 'except: pass' in /api/tasks/check meant the
+    member check silently never happened whenever the lookup hiccuped
+    or the stored channel ref was a raw invite link.)"""
+    if task["task_type"] != "force":
+        return "ok"
+    ref = (task["channel_id"] or "").strip()
+    if not ref:
+        return "check_failed"
+    m = None
+    try:
+        m = await bot.get_chat_member(chat_id=ref, user_id=uid)
+    except Exception:
+        # Older tasks may store a t.me link — retry once as @username.
+        uname = ref
+        for p in ("https://t.me/", "http://t.me/", "t.me/"):
+            if uname.startswith(p):
+                uname = uname[len(p):]
+                break
+        uname = uname.strip("/").split("/")[0].split("?")[0]
+        if uname and not uname.startswith("+") and uname != ref:
+            try:
+                m = await bot.get_chat_member(chat_id=f"@{uname}", user_id=uid)
+            except Exception:
+                return "check_failed"
+        else:
+            return "check_failed"
+    if m.status in (ChatMemberStatus.LEFT, ChatMemberStatus.KICKED, ChatMemberStatus.RESTRICTED):
+        return "not_member"
+    return "ok"
+
+
 @api_app.post("/api/tasks/join")
 async def api_tasks_join(body: TaskActionRequest):
     user = await _authenticate(body)
@@ -6018,18 +6053,10 @@ async def api_tasks_check(body: TaskActionRequest):
     remaining = int(TASK_JOIN_WAIT_SECONDS - elapsed)
     if remaining > 0:
         raise HTTPException(status_code=400, detail=f"wait:{remaining}")
-    if task["task_type"] == "force" and task["channel_id"]:
-        try:
-            m = await bot.get_chat_member(chat_id=task["channel_id"], user_id=uid)
-            if m.status in (ChatMemberStatus.LEFT, ChatMemberStatus.KICKED, ChatMemberStatus.RESTRICTED):
-                raise HTTPException(status_code=400, detail="not_member")
-        except HTTPException:
-            raise
-        except Exception:
-            # Bot isn't admin there / lookup failed — don't hard-block a
-            # legitimate user over a misconfigured channel (same policy
-            # as inspect_compulsory_memberships above).
-            pass
+    if task["task_type"] == "force":
+        verdict = await _force_membership_ok(task, uid)
+        if verdict != "ok":
+            raise HTTPException(status_code=400, detail=verdict)
     # Only reachable once the wait timer has elapsed AND (for a "force"
     # task) real membership has been confirmed above. Record that this
     # user has passed a genuine check — /api/tasks/claim will refuse to
@@ -6053,6 +6080,12 @@ async def api_tasks_claim(body: TaskActionRequest):
         # /api/tasks/check) to collect a reward without ever actually
         # joining / passing verification.
         raise HTTPException(status_code=400, detail="not_checked")
+    if task["task_type"] == "force":
+        # Re-verify at payout: passing /check and then leaving the
+        # channel before claiming must not pay either.
+        verdict = await _force_membership_ok(task, uid)
+        if verdict != "ok":
+            raise HTTPException(status_code=400, detail=verdict)
     # BUG-REPORT #3: the snapshot above can go stale (creator cancels,
     # admin deactivates, escrow sells out) between /check and this call,
     # and the old flow paid first and counted the slot afterwards — so a
@@ -6227,6 +6260,14 @@ async def api_tasks_create(body: UserTaskCreateRequest):
             member = await bot.get_chat_member(chat_id=channel_id, user_id=bot_id)
             if member.status in ("administrator", "creator"):
                 task_type = "force"
+        except Exception:
+            pass
+    if task_type == "force":
+        # Store the NUMERIC chat id so the member check at claim time
+        # always resolves, whatever form the creator typed.
+        try:
+            chat = await bot.get_chat(chat_id=channel_id)
+            channel_id = str(chat.id)
         except Exception:
             pass
     if task_type != "force":
@@ -6422,8 +6463,15 @@ async def api_admin_tasks_create(body: AdminTaskCreateRequest):
     _require_admin(user)
     if not body.title.strip():
         raise HTTPException(status_code=400, detail="title_required")
+    _ch = body.channel_id.strip()
+    if body.task_type == "force" and _ch:
+        try:
+            _chat = await bot.get_chat(chat_id=_ch)
+            _ch = str(_chat.id)
+        except Exception:
+            pass
     task_id = await DataEngine.create_task(
-        body.title.strip(), body.channel_id.strip(), body.invite_link.strip(),
+        body.title.strip(), _ch, body.invite_link.strip(),
         body.task_type, body.reward,
         instructions=body.instructions.strip(),
         screenshot_count=max(1, min(2, int(body.screenshot_count or 1))),
