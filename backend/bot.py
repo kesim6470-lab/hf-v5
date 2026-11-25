@@ -2589,19 +2589,45 @@ async def _get_bot_photo_file_id() -> str | None:
     return _bot_photo_file_id
 
 
+def invite_share_text(link: str) -> str:
+    """Anon Earn's own invite wording — used as PLAIN text in the
+    Telegram share picker (build_invite_share_url) and mirrored by the
+    Mini App Share fallback. Deliberately NOT the old checklist style:
+    gold-coin brand line, earn-loop lines, payout line, link last."""
+    return (
+        "🪙 ANON EARN — Birr, little by little, every day.\n\n"
+        "No deposit. No investment. I earn here from my phone:\n"
+        "🎬 clips I watch turn into Birr\n"
+        "🎯 small missions, quick rewards\n"
+        "🔥 a daily streak that keeps paying\n"
+        "👥 friends I bring in earn me more\n\n"
+        "Payouts go to Telebirr or Binance Pay.\n\n"
+        "Your turn — start free 👇\n"
+        f"{link}"
+    )
+
+
+def invite_card_caption() -> str:
+    """HTML twin of invite_share_text() for the invite CARD (photo +
+    caption + Join button) sent via the inline picker / share_card."""
+    return (
+        "🪙 <b>ANON EARN — Birr, little by little, every day.</b>\n\n"
+        "No deposit. No investment. I earn here from my phone:\n"
+        "🎬 clips I watch turn into Birr\n"
+        "🎯 small missions, quick rewards\n"
+        "🔥 a daily streak that keeps paying\n"
+        "👥 friends I bring in earn me more\n\n"
+        "Payouts go to <b>Telebirr</b> or <b>Binance Pay</b>.\n\n"
+        "Tap below and start free — it takes a minute 👇"
+    )
+
+
 async def _build_invite_card(uid: int):
     uname = BOT_USERNAME or (await bot.get_me()).username
     referral_link = f"https://t.me/{uname}?start={uid}"
-    caption = (
-        "🎉 <b>I'm earning real money with this bot — and you can too!</b>\n\n"
-        "✅ Complete simple tasks\n"
-        "✅ Watch short ads\n"
-        "✅ Invite friends for bonus rewards\n"
-        "✅ Withdraw straight to Telebirr\n\n"
-        "Tap the button below to join — it only takes a minute 👇"
-    )
+    caption = invite_card_caption()
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎁 Join & Start Earning", url=referral_link)],
+        [InlineKeyboardButton(text="🪙 Start on Anon Earn — Free", url=referral_link)],
     ])
     photo_id = await _get_bot_photo_file_id()
     return caption, kb, photo_id
@@ -2629,8 +2655,8 @@ async def handle_invite_inline_query(inline_query: InlineQuery):
         )
     else:
         result = InlineQueryResultArticle(
-            id=str(inline_query.from_user.id), title="📤 Share your invite",
-            description="Tap to send your invite card with a Join button",
+            id=str(inline_query.from_user.id), title="🪙 Anon Earn — Invite Card",
+            description="Tap to drop your Anon Earn card in this chat",
             input_message_content=InputTextMessageContent(message_text=caption),
             reply_markup=kb,
         )
@@ -3273,15 +3299,7 @@ def build_invite_share_url(user_id: int) -> str | None:
     if not BOT_USERNAME:
         return None
     link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-    text = (
-        "🎉 I'm earning real money with this bot — and you can too!\n\n"
-        "✅ Complete simple tasks\n"
-        "✅ Watch short ads\n"
-        "✅ Invite friends for bonus rewards\n"
-        "✅ Withdraw straight to Telebirr\n\n"
-        "Join now 👇\n"
-        f"{link}"
-    )
+    text = invite_share_text(link)
     return "https://t.me/share/url?url=&text=" + urllib.parse.quote(text, safe="")
 
 # Share button label: plain circular-arrow glyph instead of an emoji.
