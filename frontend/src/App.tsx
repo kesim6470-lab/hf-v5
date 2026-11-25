@@ -25,6 +25,8 @@ export default function App() {
     try { return (localStorage.getItem("hf-theme") as "dark" | "light") || "dark"; } catch { return "dark"; }
   });
   const [booted, setBooted] = useState(false);
+  const [forceUnjoined, setForceUnjoined] = useState<any[] | null>(null);
+  const [checkingGate, setCheckingGate] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -49,7 +51,36 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => { refreshMe().finally(() => setBooted(true)); }, [refreshMe]);
+  const fetchGate = useCallback(async () => {
+    try {
+      const g: any = await api("/api/gate/status");
+      setForceUnjoined(g?.force_unjoined || []);
+      return g?.force_unjoined || [];
+    } catch { setForceUnjoined(null); return null; }
+  }, []);
+
+  // Boot: /api/me and the force-join gate load IN PARALLEL, so the gate
+  // (when it applies) is already known at first paint — no dashboard
+  // flash followed by a banner popping in.
+  useEffect(() => {
+    Promise.all([refreshMe(), fetchGate()]).finally(() => setBooted(true));
+  }, [refreshMe, fetchGate]);
+
+  // Coming back from a channel (after tapping Join) re-checks the gate
+  // automatically — the moment every channel is joined, the app opens.
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "visible" && forceUnjoined && forceUnjoined.length > 0) fetchGate(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [fetchGate, forceUnjoined]);
+
+  async function checkGateNow() {
+    setCheckingGate(true);
+    const left = await fetchGate();
+    setCheckingGate(false);
+    if (left && left.length > 0) toast("❌ Still missing — join all channels first");
+    else if (left) toast("✅ All joined — welcome in!");
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -135,17 +166,41 @@ export default function App() {
               This account has been blacklisted. Contact support if you believe this is a mistake.
             </div>
           </div>
+        ) : forceUnjoined && forceUnjoined.length > 0 ? (
+          <div className="card app-enter" style={{ marginTop: 18 }}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>🔒 Join to continue</div>
+            <div style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.55 }}>
+              You must join <b>all</b> channels below to use Anon Earn. Tap <b>Join</b> for each one,
+              then come back — we re-check automatically, or tap the check button.
+            </div>
+            {forceUnjoined.map((c: any) => (
+              <div className="row" key={c.id} style={{ marginTop: 12, marginBottom: 0 }}>
+                <div className="tic">📣</div>
+                <div className="grow"><div className="t">{c.channel_name}</div><div className="s">Membership required</div></div>
+                <button className="btn sm" onClick={() => {
+                  const link = c.invite_link || "";
+                  if (link.startsWith("https://t.me/") && tg?.openTelegramLink) tg.openTelegramLink(link);
+                  else if (tg?.openLink) tg.openLink(link);
+                  else window.open(link, "_blank");
+                }}>Join</button>
+              </div>
+            ))}
+            <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={checkingGate} onClick={checkGateNow}>
+              {checkingGate ? "Checking…" : "✅ I Joined — Check"}
+            </button>
+          </div>
         ) : (
-          <>
+          <div className="app-enter">
             {tab === "home" && <Home />}
             {tab === "tasks" && <Tasks />}
             {tab === "invite" && <Invite />}
             {tab === "withdraw" && <Withdraw />}
             {tab === "admin" && me?.is_admin && <Admin />}
-          </>
+          </div>
         )}
       </main>
 
+      {!(forceUnjoined && forceUnjoined.length > 0 && !gateError) && (
       <nav>
         {tabs.filter((t) => t.show).map((t) => (
           <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => go(t.id)}>
@@ -153,6 +208,7 @@ export default function App() {
           </button>
         ))}
       </nav>
+      )}
 
       <div className={`toast ${toastMsg ? "show" : ""}`}>{toastMsg}</div>
     </Ctx.Provider>
