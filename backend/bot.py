@@ -3167,7 +3167,7 @@ async def report_ads_reset_broadcast_to_admins(
 def generate_verification_widget(user_id: int, ref: int, msg_id: int = 0):
     # index.html (verify screen) is served from the FRONTEND (Vercel), NOT
     # from this backend, so this must point at FRONTEND_URL, not WEBAPP_URL.
-    url = f"{FRONTEND_URL}/index.html?uid={user_id}&ref={ref}&msg_id={msg_id}"
+    url = f"{WEBAPP_URL}/verify?uid={user_id}&ref={ref}&msg_id={msg_id}"
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🔐 Open Mini App & Verify", web_app=WebAppInfo(url=url))
     ]])
@@ -5057,6 +5057,17 @@ async def api_recent_withdrawals():
 @api_app.get("/health")
 async def health_check():
     return {"ok": True}
+
+
+@api_app.get("/verify")
+async def verify_page():
+    # The standalone "Security Check" page (legacy index.html, restored in
+    # hf-v5): served by THIS backend so the bot's verification widget can
+    # point at WEBAPP_URL/verify. It collects the device fingerprint and
+    # POSTs it to /api/verify on this same origin.
+    from pathlib import Path
+    html = (Path(__file__).parent / "verify.html").read_text(encoding="utf-8")
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
 # ── /api/verify — identity/fingerprint verification (index.html) ────────
