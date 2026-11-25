@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { api, DEMO, tg, type Me } from "./api";
+import { api, API_BASE, initData, tg, type Me } from "./api";
 import Home from "./screens/Home";
 import Tasks from "./screens/Tasks";
 import Invite from "./screens/Invite";
@@ -43,7 +43,7 @@ export default function App() {
       // _authenticate's contract: 403 not_verified / banned, 401 invalid.
       if (e?.status === 403 && e?.message === "not_verified") setGateError("not_verified");
       else if (e?.status === 403 && e?.message === "banned") setGateError("banned");
-      else if (!DEMO) setGateError("load_failed");
+      else setGateError(initData ? "load_failed" : "not_telegram");
       return null;
     }
   }, []);
@@ -69,10 +69,10 @@ export default function App() {
   return (
     <Ctx.Provider value={{ me, refreshMe, toast, go }}>
       <header>
-        <div className="avatar">{(user?.first_name || me?.user_id?.toString() || "H").charAt(0).toUpperCase()}</div>
+        <div className="avatar">{(user?.first_name || me?.user_id?.toString() || "A").charAt(0).toUpperCase()}</div>
         <div>
           <div className="uname">{user?.first_name || "Guest"}</div>
-          <div className="usub">Hf Earn {DEMO && <span className="demo-badge">DEMO</span>}</div>
+          <div className="usub">Anon Earn</div>
         </div>
         <div className="spacer" />
         <button className="theme-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
@@ -83,11 +83,38 @@ export default function App() {
       <main>
         {gateError === "not_verified" ? (
           <div className="card" style={{ marginTop: 18 }}>
-            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>🔐 Verification needed</div>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>🛡️ Verification needed</div>
             <div style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.55 }}>
-              This account hasn't completed the bot's verification yet. Open the bot chat,
-              tap <b>/start</b> and finish the one-time identity check — then come back here.
+              This account hasn't completed the one-time security check yet.
+              Tap the button below — it takes a few seconds — then your account opens.
             </div>
+            <button
+              className="btn"
+              style={{ marginTop: 14, width: "100%" }}
+              onClick={() => { if (user?.id) location.href = `${API_BASE}/verify?uid=${user.id}&ref=0&msg_id=0`; }}
+            >
+              🚀 Verify Now / አረጋግጥ
+            </button>
+          </div>
+        ) : gateError === "not_telegram" ? (
+          <div className="card" style={{ marginTop: 18 }}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>📲 Open in Telegram</div>
+            <div style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.55 }}>
+              Anon Earn only works inside Telegram. Open <b>@AnonEarnAppBot</b> and tap <b>Open Mini App</b>.
+            </div>
+            <button className="btn" style={{ marginTop: 14, width: "100%" }} onClick={() => tg?.openTelegramLink?.("https://t.me/AnonEarnAppBot")}>
+              Open @AnonEarnAppBot
+            </button>
+          </div>
+        ) : gateError === "load_failed" ? (
+          <div className="card" style={{ marginTop: 18 }}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>⚠️ Couldn't load</div>
+            <div style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.55 }}>
+              We couldn't reach the server. Check your connection and try again.
+            </div>
+            <button className="btn" style={{ marginTop: 14, width: "100%" }} onClick={() => refreshMe()}>
+              🔄 Retry / እንደገና
+            </button>
           </div>
         ) : gateError === "banned" ? (
           <div className="card" style={{ marginTop: 18 }}>
