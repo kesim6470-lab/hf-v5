@@ -53,6 +53,7 @@ export default function Tasks() {
     } catch (e: any) {
       if (String(e?.message).startsWith("wait:")) toast(`⏳ Wait ${e.message.split(":")[1]}s more`);
       else if (e?.message === "not_member") toast("❌ You haven't joined yet");
+      else if (e?.message === "check_failed") toast("⚠️ Couldn't verify membership — try again in a moment");
       else toast(e?.message || "Check failed");
     }
     setBusy(null);
@@ -68,6 +69,7 @@ export default function Tasks() {
     } catch (e: any) {
       const msgs: Record<string, string> = {
         not_checked: "Tap Check first", not_claimable: "Not claimable",
+        not_member: "❌ You haven't joined yet", check_failed: "⚠️ Couldn't verify membership — try again",
         task_unavailable: "This task is no longer available", task_sold_out: "This task just sold out",
       };
       toast(msgs[e?.message] || e?.message || "Claim failed");
