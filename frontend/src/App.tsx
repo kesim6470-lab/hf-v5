@@ -73,7 +73,7 @@ export default function App() {
         <img className="splash-logo" src="/logo.png" alt="Anon Earn" />
         <div className="splash-name">Anon Earn</div>
         <div className="splash-bar"><div className="splash-fill" /></div>
-        <div className="splash-sub">Loading your account… / በመጫን ላይ…</div>
+        <div className="splash-sub">Loading your account…</div>
       </div>
     );
   }
@@ -81,7 +81,7 @@ export default function App() {
   return (
     <Ctx.Provider value={{ me, refreshMe, toast, go }}>
       <header>
-        <div className="avatar">{(user?.first_name || me?.user_id?.toString() || "A").charAt(0).toUpperCase()}</div>
+        <div className="avatar">{user?.photo_url ? <img src={user.photo_url} alt="" /> : (user?.first_name || me?.user_id?.toString() || "A").charAt(0).toUpperCase()}</div>
         <div>
           <div className="uname">{user?.first_name || "Guest"}</div>
           <div className="usub">Anon Earn</div>
@@ -105,7 +105,7 @@ export default function App() {
               style={{ marginTop: 14, width: "100%" }}
               onClick={() => { if (user?.id) location.href = `${API_BASE}/verify?uid=${user.id}&ref=0&msg_id=0`; }}
             >
-              🚀 Verify Now / አረጋግጥ
+              🚀 Verify Now
             </button>
           </div>
         ) : gateError === "not_telegram" ? (
@@ -125,7 +125,7 @@ export default function App() {
               We couldn't reach the server. Check your connection and try again.
             </div>
             <button className="btn" style={{ marginTop: 14, width: "100%" }} onClick={() => refreshMe()}>
-              🔄 Retry / እንደገና
+              🔄 Retry
             </button>
           </div>
         ) : gateError === "banned" ? (
