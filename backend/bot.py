@@ -2214,7 +2214,7 @@ class DataEngine:
 # ስልክ ሞዴል ብቻ) ብቻውን ሰውን አያስታግድም።
 # ─────────────────────────────────────────────────────────────────────────────
 
-CORRELATION_BAN_THRESHOLD = 4   # ከ 6 ሊደረስ ከሚችል ድምር ውስጥ ቢያንስ 4 ሲደርስ ብቻ BAN
+CORRELATION_BAN_THRESHOLD = 4   # unrelated-account match at/above this = strong review flag (never an auto-ban; only the inviter↔invitee pair check blocks)
 MAX_USERS_PER_IP          = 10  # ከዚህ በላይ → ጠቅሰ ብቻ (review)
 MAX_USERS_PER_IP_BAN      = 40  # ከዚህ በላይ *እና* ዝቅተኛ fingerprint diversity → BAN
 IP_FARM_MIN_FP_RATIO      = 0.5 # distinct_fp / user_count ከዚህ በታች ከሆነ "duplicate ስክሪፕት" ይመስላል
@@ -2269,9 +2269,15 @@ async def evaluate_clone_risk(
 ) -> tuple[bool, str, str]:
     """
     Returns (should_ban: bool, reason: str, detail: str).
-    Bans only when multiple independent signals correlate to the SAME other
-    account. Any single matching signal alone is logged for admin review,
-    never auto-banned. `detail` carries the matched_uid/categories/score info
+    Owner policy (2026-11-26): blocking is decided ONLY inside the
+    inviter↔invitee pair — self-invite, or the invitee sharing the
+    inviter's own device (section 3). A signal match against an
+    UNRELATED account never blocks: same phone model + shared CGNAT /
+    Wi-Fi IP + same Telegram version is normal for strangers, so those
+    matches are logged for admin review instead. (Section 4's IP-farm
+    rule also still blocks, but only on device REUSE at scale — many
+    accounts cycling a few fingerprints — never on distinct phones.)
+    `detail` carries the matched_uid/categories/score info
     (plus the flagged user's own @username, when known) so the admin fraud
     log can show exactly who a ban correlated with.
     """
@@ -2324,22 +2330,20 @@ async def evaluate_clone_risk(
             if score > best_score:
                 best_score, best_uid, best_matched = score, row["user_id"], matched
 
-        if best_score >= CORRELATION_BAN_THRESHOLD:
+        if best_score >= 1:
+            # Never auto-block on an unrelated-account match (see the
+            # policy note in this function's docstring) — log it for
+            # admin review, strongly worded when the correlation is high.
+            strong = best_score >= CORRELATION_BAN_THRESHOLD
             logger.warning(
-                f"[FRAUD] Correlated clone: new_uid={new_user_id} matches "
-                f"uid={best_uid} on {best_matched} (score={best_score})"
-            )
-            return True, "correlated_clone", (
-                f"matches_uid={best_uid} categories={best_matched} "
-                f"score={best_score} {uname_tag}"
-            )
-        elif best_score >= 1:
-            logger.warning(
-                f"[FRAUD-WARN] Partial signal match (not banning): "
-                f"new_uid={new_user_id} matches uid={best_uid} on {best_matched} (score={best_score})"
+                f"[FRAUD-WARN] {'Strong' if strong else 'Partial'} signal match "
+                f"vs unrelated account (not banning): new_uid={new_user_id} "
+                f"matches uid={best_uid} on {best_matched} (score={best_score})"
             )
             await DataEngine.log_fraud_attempt(
-                new_user_id, "partial_signal_match", client_ip,
+                new_user_id,
+                "correlated_match_review" if strong else "partial_signal_match",
+                client_ip,
                 f"matches_uid={best_uid} categories={best_matched} score={best_score} {uname_tag}"
             )
 
