@@ -81,16 +81,28 @@ body::after{
 .icon-zone.state-err .spin-ring{display:none;}
 .title{font-family:'Space Grotesk',sans-serif;font-size:1.28rem;font-weight:700;letter-spacing:.01em;color:var(--ink);margin-bottom:5px;}
 .sub{font-size:.78rem;color:var(--ink-faint);line-height:1.5;margin-bottom:22px;min-height:2.2em;}
-.bar-track{height:5px;background:rgba(255,255,255,.07);border-radius:99px;margin-bottom:18px;overflow:hidden;}
+.bar-track{height:10px;background:rgba(255,255,255,.07);border-radius:99px;margin-bottom:18px;overflow:hidden;position:relative;}
 .bar-fill{
-  height:100%;width:0%;border-radius:99px;
+  height:100%;width:0%;border-radius:99px;position:relative;overflow:hidden;
   background:linear-gradient(90deg,#0ea5c6,#22d3ee,#a78bfa);
-  box-shadow:0 0 12px rgba(34,211,238,.55);
+  box-shadow:0 0 14px rgba(34,211,238,.6);
   transition:width .5s cubic-bezier(.4,0,.2,1);
 }
+.bar-fill::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(105deg,transparent 20%,rgba(255,255,255,.55) 50%,transparent 80%);
+  animation:sweep 1.15s linear infinite;
+}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 .bar-fill.s-ok{background:linear-gradient(90deg,#0d9668,#2ee6a8);box-shadow:0 0 12px rgba(46,230,168,.5);width:100%!important;}
 .bar-fill.s-err{background:linear-gradient(90deg,#be3455,#fb7185);box-shadow:0 0 12px rgba(251,113,133,.5);width:100%!important;}
-.steps{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;}
+.brand{display:flex;flex-direction:column;align-items:center;gap:9px;margin-bottom:18px;}
+.brand-coin{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.45rem;color:#3a2a05;
+  background:radial-gradient(circle at 32% 30%,#ffe9a8,#f5c542 55%,#c8890a);
+  border:2px solid rgba(255,233,168,.75);box-shadow:0 8px 26px rgba(245,197,66,.35),inset 0 -3px 8px rgba(0,0,0,.25);}
+.brand-name{font-family:'Space Grotesk',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.42em;color:var(--ink-dim);text-indent:.42em;}
+.steps{display:none;}
 .step{
   display:flex;align-items:center;gap:11px;
   padding:11px 13px;
@@ -156,6 +168,7 @@ body::after{
 </head>
 <body>
 <div class="card">
+  <div class="brand"><div class="brand-coin">A</div><div class="brand-name">ANON EARN</div></div>
   <div class="icon-zone" id="iconZone">
     <div class="spin-ring"></div>
     <div class="icon-bg"></div>
@@ -172,7 +185,7 @@ body::after{
     </svg>
   </div>
   <div class="title" id="ttl">Security Check</div>
-  <div class="sub"   id="sub">Verifying your identity…</div>
+  <div class="sub"   id="sub">Verifying in the background… / ከጀርባ በመረጋገጥ ላይ…</div>
   <div class="bar-track"><div class="bar-fill" id="bar"></div></div>
   <div class="steps">
     <div class="step active" id="s1">
