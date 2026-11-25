@@ -38,7 +38,7 @@ export default function Invite() {
         📋 Copy link
       </button>
       <button className="btn ghost" onClick={() => {
-        if (tg) tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(me.referral_link) + "&text=" + encodeURIComponent("Join Hf Earn and earn Birr daily!"));
+        if (tg) tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(me.referral_link) + "&text=" + encodeURIComponent("Join Anon Earn and earn Birr daily!"));
         else { navigator.clipboard?.writeText(me.referral_link); toast("Link copied 📋"); }
       }}>
         📤 Share
