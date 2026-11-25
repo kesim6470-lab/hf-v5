@@ -1,0 +1,4007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta http-equiv="Cache-Control" content="public, max-age=300"/>
+<title>Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — "NEON GLASS LUXURY"
+   Deep obsidian background (#060809) with ambient neon mesh glow.
+   Electric Lime (#C8F24D) & Cyber Amber (#FFB800) accents.
+   Ultra-sleek Glassmorphism with backdrop blur and hairline borders.
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #060809;
+  --surface: rgba(18, 22, 20, 0.72);
+  --surface-solid: #111513;
+  --surface2: rgba(26, 32, 28, 0.85);
+  --border: rgba(200, 242, 77, 0.16);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --lime: #c8f24d;
+  --lime-glow: rgba(200, 242, 77, 0.35);
+  --lime-deep: #9bc22c;
+  --amber: #ffb800;
+  --amber-glow: rgba(255, 184, 0, 0.35);
+  --danger: #ff4d4d;
+  --danger-glow: rgba(255, 77, 77, 0.3);
+  --ink: #f8fafc;
+  --ink-dim: #a1a89c;
+  --ink-faint: #62685d;
+  --card-gradient: linear-gradient(145deg, rgba(28, 36, 26, 0.9) 0%, rgba(12, 16, 13, 0.95) 100%);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+body {
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(200, 242, 77, 0.05) 0%, transparent 60%),
+    radial-gradient(circle at 8% 100%, rgba(255, 184, 0, 0.04) 0%, transparent 55%);
+}
+
+/* ── Ambient Mesh Background ───────────
+   Slow-drifting, blurred lime/amber blobs behind the glass cards —
+   pure transform+opacity animation (no filter animation) so it stays
+   GPU-cheap even on lower-end phones. */
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+  /* Isolate this whole layer on its own GPU compositor layer once, up
+     front, so animating children never triggers the rest of the page
+     to repaint — this is the single biggest lever for phone heat. */
+  transform: translateZ(0);
+  contain: strict;
+}
+.mesh-bg .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.mesh-bg .blob.lime-1 {
+  width: 62vw; height: 62vw; left: -18vw; top: -20vw;
+  background: radial-gradient(circle, rgba(200,242,77,0.30) 0%, rgba(200,242,77,0.08) 45%, transparent 72%);
+  animation: meshDrift1 26s ease-in-out infinite;
+}
+.mesh-bg .blob.amber-1 {
+  width: 58vw; height: 58vw; right: -20vw; top: 8vh;
+  background: radial-gradient(circle, rgba(255,184,0,0.24) 0%, rgba(255,184,0,0.06) 45%, transparent 72%);
+  animation: meshDrift2 32s ease-in-out infinite;
+}
+.mesh-bg .blob.lime-2 {
+  width: 46vw; height: 46vw; left: 6vw; bottom: -14vh;
+  background: radial-gradient(circle, rgba(155,194,44,0.20) 0%, rgba(155,194,44,0.05) 45%, transparent 70%);
+  animation: meshDrift3 38s ease-in-out infinite;
+}
+.mesh-bg .blob.amber-2 {
+  width: 40vw; height: 40vw; right: -6vw; bottom: 4vh;
+  background: radial-gradient(circle, rgba(255,184,0,0.16) 0%, rgba(255,184,0,0.04) 45%, transparent 70%);
+  animation: meshDrift4 30s ease-in-out infinite;
+}
+.mesh-bg .blob.core {
+  width: 34vw; height: 34vw; left: 33vw; top: 32vh;
+  background: radial-gradient(circle, rgba(200,242,77,0.10) 0%, transparent 68%);
+  animation: meshPulse 16s ease-in-out infinite;
+}
+.mesh-bg::after {
+  /* fine vignette + faint grain-like edge darkening for depth */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 40%, transparent 40%, rgba(2,3,3,0.55) 100%);
+}
+/* Translate-only, no scale — scaling a blurred layer forces the
+   browser to re-filter it at the new size every frame; a pure
+   translate just slides the already-rasterized blur, which the GPU
+   compositor can do for free. Opacity is still cheap to animate too. */
+@keyframes meshDrift1 {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .85; }
+  50% { transform: translate3d(4vw, 6vh, 0); opacity: 1; }
+}
+@keyframes meshDrift2 {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .75; }
+  50% { transform: translate3d(-5vw, 5vh, 0); opacity: .95; }
+}
+@keyframes meshDrift3 {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .7; }
+  50% { transform: translate3d(3vw, -4vh, 0); opacity: .9; }
+}
+@keyframes meshDrift4 {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .6; }
+  50% { transform: translate3d(-3vw, -5vh, 0); opacity: .85; }
+}
+@keyframes meshPulse {
+  0%, 100% { opacity: .5; }
+  50% { opacity: .9; }
+}
+
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+button:focus, a:focus { outline: none; }
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  margin: 0 auto;
+  height: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 14px 0;
+}
+
+#view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(130px + env(safe-area-inset-bottom));
+}
+
+::-webkit-scrollbar { display: none; }
+
+/* ── Keyframes ──────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulseRing { 0% { transform: scale(.85); opacity: .9; } 70% { transform: scale(1.35); opacity: 0; } 100% { opacity: 0; } }
+@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes popIn { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes tickDraw { from { stroke-dashoffset: 32; } to { stroke-dashoffset: 0; } }
+@keyframes barSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+@keyframes cardIn {
+  from { opacity: 0; transform: perspective(900px) rotateX(12deg) rotateY(-10deg) translateY(20px) scale(.94); }
+  to { opacity: 1; transform: perspective(900px) rotateX(2deg) rotateY(-4deg) translateY(0) scale(1); }
+}
+@keyframes tabFadeIn { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.tab-fade { animation: tabFadeIn .38s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ── Splash Screen ────────────────── */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  transition: opacity .45s ease, visibility .45s ease;
+}
+#splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+.splash-mark { position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; z-index: 1; }
+.splash-mark .ping { position: absolute; inset: 0; border-radius: 22px; border: 2px solid var(--lime); animation: pulseRing 1.8s cubic-bezier(.3,.6,.4,1) infinite; }
+.splash-mark .ping:nth-child(2) { animation-delay: .6s; }
+.splash-mark .core {
+  position: relative; width: 60px; height: 60px; border-radius: 18px;
+  background: var(--lime);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: 1.2rem; color: #060809;
+  box-shadow: 0 0 45px var(--lime-glow);
+}
+.splash-ring { position: absolute; inset: -9px; border-radius: 22px; border: 2.5px solid transparent; border-top-color: var(--lime); border-right-color: var(--lime); animation: spin 1s linear infinite; }
+.splash-word { font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 1.05rem; letter-spacing: .02em; color: var(--ink); z-index: 1; }
+.splash-word span { color: var(--lime); }
+.splash-track { width: 160px; height: 3px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; position: relative; z-index: 1; }
+.splash-track i { position: absolute; top: 0; left: 0; height: 100%; width: 40%; border-radius: 99px; background: var(--lime); animation: barSlide 1.1s ease-in-out infinite; }
+.splash-sub { font-size: 0.68rem; color: var(--ink-faint); letter-spacing: .1em; z-index: 1; text-transform: uppercase; font-weight: 600; }
+
+/* ── Skeleton ─────────────────────── */
+.skel {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; border-radius: 16px;
+}
+.skel-hero { height: 190px; margin-bottom: 14px; border-radius: 24px; }
+.skel-line { height: 14px; border-radius: 8px; margin-bottom: 10px; }
+.skel-card { height: 68px; margin-bottom: 10px; border-radius: 18px; }
+
+
+@keyframes dashboardReveal {
+  /* No filter:blur here on purpose — animating blur forces the browser
+     to re-rasterize this large element every frame, which is what read
+     as choppy/laggy on slower phones. Opacity + transform alone are
+     compositor-only, so this stays smooth even on weak Android WebViews. */
+  0% {
+    opacity: 0;
+    transform: perspective(1200px) translateY(18px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1200px) translateY(0) scale(1);
+  }
+}
+
+.dashboard-enter {
+  animation: dashboardReveal 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Lightweight update — used every time renderHome() re-runs after the
+   first load (after watching an ad, claiming check-in, etc.). A staggered
+   per-card cascade at this speed read as flickering/blinking rather than
+   smooth, so this is one single, slow, gentle motion instead — every
+   card moves together as one calm "breath in", not a rapid ripple.
+   Starts partway visible (not fully blank) so there's no jarring flash
+   the instant the DOM is rebuilt. */
+@keyframes cardRefresh {
+  from { opacity: 0.45; transform: translateY(5px); }
+  to   { opacity: 1;    transform: translateY(0); }
+}
+.dashboard-refresh > * {
+  opacity: 0.45;
+  animation: cardRefresh .6s cubic-bezier(.22,.7,.25,1) forwards;
+}
+
+/* Balance "roll" — when a reward lands, the number itself does a small
+   odometer-style flourish: the old value slides up and out while the
+   new value slides up in from below, overlapping briefly. Only the
+   number gets this; nothing else on the card needs to move. */
+
+
+#view {
+  /* filter:blur removed from this transition — see note on dashboardReveal
+     above. Same fix, same reason: this is the very first thing that
+     animates on app open, so it mattered most for the "slow on open" feel. */
+  opacity: 0;
+  transform: perspective(1000px) translateY(16px) scale(0.98);
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#view.revealed {
+  opacity: 1;
+  transform: perspective(1000px) translateY(0) scale(1);
+}
+
+/* ── Cascade ──────────────────────── */
+/* Delays tightened (was up to .38s + .5s duration = .88s before the last
+   card even started) so the whole cascade finishes well under half a
+   second instead of stacking on top of dashboard-enter and #view's own
+   reveal — that stacking is what made the first paint feel sluggish. */
+.cascade > * { opacity: 0; animation: fadeSlideUp .32s cubic-bezier(.2,.8,.2,1) forwards; }
+.cascade > *:nth-child(1) { animation-delay: .01s; }
+.cascade > *:nth-child(2) { animation-delay: .04s; }
+.cascade > *:nth-child(3) { animation-delay: .07s; }
+.cascade > *:nth-child(4) { animation-delay: .10s; }
+.cascade > *:nth-child(5) { animation-delay: .13s; }
+.cascade > *:nth-child(6) { animation-delay: .16s; }
+.cascade > *:nth-child(n+7) { animation-delay: .19s; }
+
+/* ── Spinners ─────────────────────── */
+.spin-ico { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(0,0,0,.3); border-top-color: #060809; display: inline-block; animation: spin .7s linear infinite; vertical-align: -3px; }
+.task-btn.dark-spin .spin-ico { border-color: rgba(0,0,0,.3); border-top-color: #060809; }
+.btn .spin-ico { margin-right: 7px; border-color: rgba(0,0,0,.3); border-top-color: #060809; }
+.btn.ghost .spin-ico { border-color: rgba(255,255,255,.3); border-top-color: #fff; }
+
+/* ── Gate ─────────────────────────── */
+#gate, #notTg {
+  position: fixed; inset: 0; z-index: 90; background: var(--bg); display: flex; flex-direction: column;
+  padding: 26px 18px calc(20px + env(safe-area-inset-bottom));
+}
+.notg-badge {
+  width: 68px; height: 68px; border-radius: 20px;
+  background: linear-gradient(135deg,#2AABEE,#229ED9); display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; box-shadow: 0 14px 34px rgba(42,171,238,.35); margin-bottom: 12px;
+}
+.notg-h1 { font-family: 'Unbounded', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+.notg-p { font-size: 0.85rem; color: var(--ink-dim); line-height: 1.5; max-width: 300px; text-align: center; }
+.notg-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg,#2AABEE,#229ED9); color: #fff; font-weight: 700; font-size: 0.92rem;
+  padding: 14px 24px; border-radius: 16px; text-decoration: none; box-shadow: 0 14px 34px rgba(42,171,238,.35); margin-top: 14px;
+}
+.gate-head { text-align: center; margin: 10px 0 22px; }
+.gate-badge {
+  width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px;
+  background: var(--lime); display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; box-shadow: 0 14px 34px var(--lime-glow);
+}
+.gate-head h1 { font-family: 'Unbounded', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+.gate-head p { font-size: 0.82rem; color: var(--ink-dim); line-height: 1.4; padding: 0 8px; }
+#gateList { flex: 1; overflow-y: auto; }
+.gate-ch {
+  display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 16px; padding: 14px; margin-bottom: 10px; opacity: 0; animation: fadeSlideUp .4s ease forwards;
+}
+.gate-ch .gc-ic { width: 40px; height: 40px; border-radius: 12px; background: rgba(200,242,77,.1); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+.gate-ch .gc-name { font-weight: 700; font-size: 0.88rem; flex: 1; min-width: 0; }
+.gate-ch a.btn { width: auto; padding: 9px 16px; font-size: 0.78rem; flex-shrink: 0; }
+
+/* ── Topbar / Header ────────────────── */
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: 8px; font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: 0.92rem; letter-spacing: -.02em; color: var(--ink); text-transform: uppercase; }
+.brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px var(--lime-glow); }
+.bal-chip {
+  display: flex; align-items: center; gap: 6px; background: rgba(200, 242, 77, 0.08); border: 1px solid rgba(200, 242, 77, 0.25);
+  padding: 6px 14px; border-radius: 99px; font-weight: 700; font-size: 0.82rem; color: var(--lime);
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; box-shadow: 0 4px 16px rgba(0,0,0,0.3); backdrop-filter: blur(12px);
+}
+
+/* ── Hero Debit Card ────────────────── */
+.hero {
+  background: var(--card-gradient);
+  border: 1px solid var(--border);
+  border-radius: 24px; padding: 24px 22px 20px; margin-bottom: 20px; position: relative; overflow: hidden;
+  transform: perspective(900px) rotateX(2deg) rotateY(-4deg);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(200, 242, 77, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+/* cardIn (3D pop-in) only plays on the very first paint of the home
+   tab — .dashboard-enter is the wrapper renderHome() only adds the
+   first time (_homeRenderedOnce). Every later renderHome() call
+   (after watching an ad, claiming check-in, a tab switch back, an
+   error…) rebuilds this same .hero element from scratch via innerHTML,
+   so having the animation on the base .hero rule replayed it EVERY
+   single time — a 0.6s 3D rotate-and-fade snapping in on every quick
+   refresh is exactly what read as the home tab "flickering". */
+.dashboard-enter .hero {
+  animation: cardIn .4s cubic-bezier(.2,.8,.2,1) both;
+}
+.hero::before {
+  content: ''; position: absolute; inset: -50%;
+  background: radial-gradient(circle at 30% 20%, rgba(200, 242, 77, 0.15) 0%, transparent 60%); pointer-events: none;
+}
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; position: relative; z-index: 1; margin-bottom: 22px; }
+.hero .chip {
+  width: 42px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #FFE082, #B89A4A); position: relative;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.hero .chip::before { content: ''; position: absolute; inset: 6px; border: 1px solid rgba(0, 0, 0, 0.3); border-radius: 4px; }
+.hero .netmark { font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: 0.75rem; color: var(--lime); letter-spacing: .05em; text-transform: uppercase; text-align: right; text-shadow: 0 0 12px var(--lime-glow); }
+.hero .netmark small { display: block; color: var(--ink-dim); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.58rem; letter-spacing: .1em; margin-top: 3px; }
+.hero .label { font-size: 0.68rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .14em; font-weight: 700; position: relative; z-index: 1; }
+.hero .amount {
+  font-family: 'JetBrains Mono', monospace; font-size: 2.3rem; font-weight: 800; color: #ffffff; letter-spacing: -.02em;
+  margin: 6px 0 2px; position: relative; z-index: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+.hero .amount span.unit { font-size: 1.05rem; color: var(--lime); font-weight: 700; font-family: 'Unbounded', sans-serif; margin-left: 4px; }
+.hero .sub { font-size: 0.7rem; color: var(--ink-dim); position: relative; z-index: 1; font-family: 'JetBrains Mono', monospace; letter-spacing: .04em; }
+.stat-row { display: flex; gap: 8px; margin-top: 20px; position: relative; z-index: 1; }
+.stat-box { flex: 1; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 10px 10px; backdrop-filter: blur(10px); }
+.stat-box .n { font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; font-weight: 700; color: var(--ink); }
+.stat-box .l { font-size: 0.58rem; color: var(--ink-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+
+h2.sect { font-family: 'Unbounded', sans-serif; font-size: 0.72rem; font-weight: 700; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .12em; margin: 22px 0 12px; }
+
+/* ── Cards ──────────────────────────── */
+.card {
+  background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-soft); border-radius: 20px; padding: 18px; margin-bottom: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35); transition: border-color 0.3s cubic-bezier(.2,.8,.2,1), transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.3s cubic-bezier(.2,.8,.2,1);
+}
+
+/* ── Buttons ────────────────────────── */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; text-align: center;
+  padding: 14px 18px; border-radius: 16px; border: none; font-weight: 700; font-size: 0.88rem; font-family: 'Inter', sans-serif;
+  cursor: pointer; color: #060809; background: var(--lime); box-shadow: 0 8px 20px var(--lime-glow);
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.2s ease, background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+  position: relative; overflow: hidden;
+}
+.btn .ripple {
+  position: absolute; border-radius: 50%; transform: scale(0);
+  background: rgba(255,255,255,.5); pointer-events: none;
+  animation: rippleEffect .55s cubic-bezier(.2,.8,.2,1) forwards;
+}
+@keyframes rippleEffect { to { transform: scale(2.6); opacity: 0; } }
+.btn:active { transform: scale(0.97); filter: brightness(0.92); }
+.btn:disabled { opacity: 0.4; cursor: default; transform: none; box-shadow: none; }
+.btn.gold { background: linear-gradient(135deg, #FFC72C, #FF9900); color: #1A0E00; box-shadow: 0 8px 20px var(--amber-glow); }
+.btn.glass-gold {
+  background: linear-gradient(135deg, rgba(255,199,44,.22) 0%, rgba(255,153,0,.06) 55%, rgba(255,199,44,.14) 100%);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255,199,44,.7);
+  color: #ffe9ab;
+  box-shadow: 0 0 20px rgba(255,184,0,.18), 0 10px 24px rgba(0,0,0,.4);
+}
+.btn.glass-gold:active { box-shadow: 0 0 26px rgba(255,184,0,.26), 0 10px 24px rgba(0,0,0,.45); }
+.btn.glass-gold .ripple { background: rgba(255,199,44,.35); }
+.btn.glass-gold .spin-ico { border-color: rgba(255,233,171,.35); border-top-color: #ffe9ab; }
+.btn.ghost { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-soft); color: var(--ink); box-shadow: none; }
+.btn.ghost:hover, .btn.ghost:active { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); }
+.btn.sm { padding: 10px 14px; font-size: 0.8rem; border-radius: 12px; }
+.btn.danger { background: var(--danger); color: #fff; box-shadow: 0 8px 20px var(--danger-glow); }
+.btn.pill { width: auto; flex-shrink: 0; padding: 9px 16px; border-radius: 999px; font-size: .78rem; gap: 6px; white-space: nowrap; }
+
+/* ── Reward cards (Watch & Earn / Daily Check-in) ──────────────── */
+.reward-card { position: relative; overflow: hidden; }
+.reward-card::before {
+  content: ''; position: absolute; top: -40%; right: -30%; width: 70%; height: 140%;
+  border-radius: 50%; pointer-events: none; opacity: .55; filter: blur(6px);
+}
+.reward-card.lime { border-color: rgba(200,242,77,.20); background: linear-gradient(160deg, rgba(200,242,77,.05) 0%, var(--surface) 45%); }
+.reward-card.lime::before { background: radial-gradient(circle, rgba(200,242,77,.16) 0%, transparent 70%); }
+.reward-card.gold { border-color: rgba(255,184,0,.24); background: linear-gradient(160deg, rgba(255,184,0,.06) 0%, var(--surface) 45%); }
+.reward-card.gold::before { background: radial-gradient(circle, rgba(255,184,0,.18) 0%, transparent 70%); }
+
+.reward-head { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
+.reward-info { flex: 1; min-width: 0; }
+.reward-title { font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: .82rem; letter-spacing: .01em; }
+
+.icon-badge {
+  width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+}
+.icon-badge.lime { background: linear-gradient(135deg, rgba(200,242,77,.28), rgba(200,242,77,.06)); box-shadow: inset 0 0 0 1px rgba(200,242,77,.3); }
+.icon-badge.gold { background: linear-gradient(135deg, rgba(255,184,0,.28), rgba(255,184,0,.06)); box-shadow: inset 0 0 0 1px rgba(255,184,0,.32); }
+
+.streak-pill {
+  display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+  background: rgba(255,184,0,.12); border: 1px solid rgba(255,184,0,.28);
+  padding: 5px 10px; border-radius: 999px; font-family: 'JetBrains Mono', monospace;
+  font-size: .76rem; font-weight: 700; color: var(--amber);
+}
+
+.mini-progress-track { position: relative; z-index: 1; height: 6px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; margin-top: 12px; }
+.mini-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--lime-deep), var(--lime)); transition: width .4s ease; }
+
+input, select, textarea {
+  width: 100%; background: rgba(10, 14, 12, 0.8); border: 1px solid var(--border-soft); color: var(--ink);
+  padding: 13px 15px; border-radius: 14px; font-size: 0.88rem; font-family: 'Inter', inherit; margin-bottom: 12px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--lime); box-shadow: 0 0 12px var(--lime-glow); }
+label.f { font-size: 0.68rem; color: var(--ink-dim); font-weight: 700; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: .08em; }
+
+/* ── Tasks ──────────────────────────── */
+.task {
+  display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 18px; padding: 14px 16px; margin-bottom: 12px; backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3); transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.task.completed { opacity: 0.45; }
+.task-ic { width: 42px; height: 42px; border-radius: 14px; background: rgba(200,242,77,0.12); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0; }
+.task-body { flex: 1; min-width: 0; }
+.task-title { font-size: 0.88rem; font-weight: 700; color: var(--ink); }
+.task-reward { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: var(--lime); font-weight: 700; margin-top: 3px; }
+.task-btn {
+  flex-shrink: 0; padding: 10px 16px; border-radius: 12px; border: none; font-weight: 700; font-size: 0.78rem;
+  cursor: pointer; font-family: 'Inter', sans-serif; min-width: 80px; text-align: center;
+}
+.task-btn.join { background: var(--lime); color: #060809; box-shadow: 0 4px 14px var(--lime-glow); }
+.task-btn.wait { background: rgba(255,255,255,.08); color: var(--ink-dim); }
+.task-btn.check { background: #3a7bd5; color: #fff; box-shadow: 0 4px 14px rgba(58,123,213,0.4); }
+.task-btn.claim { background: var(--amber); color: #1A0E00; box-shadow: 0 4px 14px var(--amber-glow); }
+.task-btn.done { background: rgba(200,242,77,.12); color: var(--lime); }
+
+/* ── Manual/screenshot task — numbered steps, warning banner, drop-zone ──
+   Instructions are still a single free-text field on the admin side
+   (with 1️⃣2️⃣3️⃣ and ⚠️ typed inline, same as before); parseInstructions()
+   below splits that one string into these visuals automatically. */
+.ms-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.ms-heading { font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: .82rem; color: var(--ink); margin-bottom: 2px; }
+.ms-step { display: flex; gap: 10px; align-items: flex-start; }
+.ms-num {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 7px; background: rgba(200,242,77,.14);
+  border: 1px solid var(--border); color: var(--lime); font-family: 'JetBrains Mono', monospace;
+  font-size: .7rem; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.ms-step p { font-size: .8rem; line-height: 1.5; color: var(--ink); }
+.ms-warn {
+  display: flex; gap: 8px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(255,184,0,.08); border: 1px solid rgba(255,184,0,.25);
+  font-size: .74rem; line-height: 1.5; color: #ffd479;
+}
+.ms-drop {
+  display: block; border: 1.5px dashed rgba(200,242,77,.35); border-radius: 16px;
+  padding: 22px 16px; text-align: center; cursor: pointer;
+  transition: border-color .2s ease, background .2s ease;
+}
+.ms-drop:active { background: rgba(200,242,77,.05); border-color: var(--lime); }
+.ms-drop.filled { border-style: solid; border-color: var(--lime-deep); background: rgba(200,242,77,.05); }
+.ms-drop-ic { font-size: 1.6rem; margin-bottom: 6px; }
+.ms-drop-t1 { font-size: .8rem; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.ms-drop-t2 { font-size: .68rem; color: var(--ink-faint); margin-top: 2px; }
+.ms-slot label.f { margin-bottom: 8px; }
+.ms-preview { display: none; max-width: 100%; border-radius: 14px; margin-top: 8px; border: 1px solid var(--border-soft); }
+input[type="file"].ms-input { display: none; }
+
+/* ── Toast Notification Banner ───────── */
+.toast {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%) translateY(-150%);
+  min-width: 260px;
+  max-width: calc(100% - 24px);
+  background: rgba(18, 24, 20, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  padding: 14px 18px;
+  border-radius: 18px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.35s ease;
+  z-index: 100;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 20px rgba(200, 242, 77, 0.15);
+  font-family: 'Inter', sans-serif;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast .t-ic { width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; }
+.toast.success { border-color: rgba(200, 242, 77, 0.4); }
+.toast.success .t-ic { background: rgba(200, 242, 77, 0.2); color: var(--lime); }
+.toast.error { border-color: rgba(255, 77, 77, 0.4); }
+.toast.error .t-ic { background: rgba(255, 77, 77, 0.2); color: var(--danger); }
+.toast.info { border-color: rgba(255, 184, 0, 0.4); }
+.toast.info .t-ic { background: rgba(255, 184, 0, 0.2); color: var(--amber); }
+.toast.loading .t-ic { background: rgba(255, 184, 0, 0.2); color: var(--amber); }
+.toast .t-msg { line-height: 1.35; }
+
+/* ── Floating Bottom Navbar with High-Grade Animations ──────────── */
+@keyframes navbarSlideUp {
+  0% { transform: translateY(80px) scale(0.92); opacity: 0; }
+  70% { transform: translateY(-4px) scale(1.02); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes navGlowPulse {
+  0%, 100% { box-shadow: 0 16px 40px rgba(0,0,0,0.7), 0 0 20px rgba(200, 242, 77, 0.12); }
+  50% { box-shadow: 0 20px 50px rgba(0,0,0,0.85), 0 0 32px rgba(200, 242, 77, 0.28); }
+}
+
+@keyframes navBounce {
+  0% { transform: scale(0.85) translateY(4px); }
+  50% { transform: scale(1.15) translateY(-5px); }
+  75% { transform: scale(0.95) translateY(1px); }
+  100% { transform: scale(1) translateY(-2px); }
+}
+
+@keyframes activeDotGlow {
+  0%, 100% { transform: scale(1); opacity: 0.9; box-shadow: 0 0 8px var(--lime); }
+  50% { transform: scale(1.4); opacity: 1; box-shadow: 0 0 16px var(--lime); }
+}
+
+.navbar {
+  position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 50;
+  background: rgba(14, 18, 16, 0.88); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border); border-radius: 24px; max-width: 450px; margin: 0 auto;
+  display: flex; justify-content: space-around; padding: 8px 6px; will-change: transform;
+  animation: navbarSlideUp 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) both, navGlowPulse 3.5s ease-in-out infinite;
+}
+.nav-btn {
+  position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: none; color: var(--ink-faint); font-family: 'Inter', sans-serif; font-size: 0.62rem; font-weight: 700;
+  cursor: pointer; padding: 8px 14px; border-radius: 16px;
+  transition: color 0.3s cubic-bezier(0.2,0.8,0.2,1), background 0.3s cubic-bezier(0.2,0.8,0.2,1), transform 0.2s ease;
+}
+.nav-btn .ripple {
+  position: absolute; border-radius: 50%; transform: scale(0);
+  background: rgba(200,242,77,.3); pointer-events: none;
+  animation: rippleEffect .5s cubic-bezier(.2,.8,.2,1) forwards;
+}
+.nav-btn:active { transform: scale(0.88); }
+.nav-btn .ic { font-size: 1.2rem; display: inline-block; transition: transform 0.35s cubic-bezier(.34,1.56,.64,1), filter 0.3s ease; }
+.nav-btn.active {
+  color: var(--lime);
+  background: linear-gradient(135deg, rgba(200, 242, 77, 0.18), rgba(200, 242, 77, 0.05));
+  border: 1px solid rgba(200, 242, 77, 0.35);
+  box-shadow: 0 8px 24px rgba(200, 242, 77, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: navBounce 0.45s cubic-bezier(.34,1.56,.64,1) both;
+}
+.nav-btn.active .ic { transform: scale(1.22) translateY(-2px); filter: drop-shadow(0 4px 10px var(--lime-glow)); }
+.nav-btn.active::after {
+  content: ''; position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--lime); box-shadow: 0 0 10px var(--lime);
+  /* dotPop plays once on tab switch (cheap: transform+opacity only), then
+     activeDotGlow's own pulsing continues after it finishes. */
+  animation: dotPop .28s cubic-bezier(.34,1.56,.64,1) both,
+             activeDotGlow 2s ease-in-out .28s infinite;
+}
+@keyframes dotPop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ── Support FAB ────────────────────── */
+.support-fab {
+  position: fixed; right: 16px; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 60;
+  width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #2AABEE, #229ED9); color: #fff; font-size: 1.2rem;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(42,171,238,0.45);
+  animation: fabPulse 2.4s ease-in-out infinite;
+}
+.support-fab:active { transform: scale(.93); }
+
+.add-task-btn {
+  width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0;
+  background: linear-gradient(135deg, #ffcf4d, #ffb300); color: #0a0d05; font-size: 1.2rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+  box-shadow: 0 4px 14px rgba(255,179,0,.4);
+}
+
+.copybox { display: flex; gap: 8px; }
+.copybox input { margin-bottom: 0; font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; }
+.empty { text-align: center; padding: 36px 12px; color: var(--ink-faint); font-size: 0.85rem; }
+.pill-tag { display: inline-block; font-family: 'Inter', sans-serif; font-size: 0.58rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: .04em; }
+.pill-tag.force { background: rgba(255,77,77,.15); color: var(--danger); }
+.pill-tag.fake { background: rgba(200,242,77,.15); color: var(--lime); }
+.row2 { display: flex; gap: 10px; }
+.row2 > * { flex: 1; }
+.admin-nav { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 4px; }
+.admin-nav button {
+  flex-shrink: 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border-soft); color: var(--ink-dim);
+  padding: 8px 14px; border-radius: 10px; font-size: 0.74rem; font-weight: 700; font-family: 'Inter', sans-serif; cursor: pointer;
+}
+.admin-nav button.active { background: var(--lime); border-color: var(--lime); color: #060809; box-shadow: 0 4px 14px var(--lime-glow); }
+.list-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.05); transition: transform 0.2s cubic-bezier(.2,.8,.2,1), opacity 0.2s ease; }
+.list-item[onclick]:active { transform: scale(0.985); opacity: 0.85; }
+.list-item:last-child { border-bottom: none; }
+.mini { font-size: 0.7rem; color: var(--ink-faint); }
+.loading { text-align: center; padding: 44px; color: var(--ink-faint); font-size: 0.88rem; font-family: 'Unbounded', sans-serif; }
+
+/* ── Claim celebration burst ─────────────────────── */
+#confettiLayer { position: fixed; inset: 0; z-index: 900; pointer-events: none; overflow: hidden; }
+@keyframes confettiBurst {
+  0%   { transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(.4); opacity: 0; }
+}
+.confetti-bit {
+  position: absolute; top: 0; left: 0; width: var(--sz); height: var(--sz);
+  background: var(--col); border-radius: var(--rad);
+  animation: confettiBurst var(--dur) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+@keyframes confettiRain {
+  0%   { transform: translate(0, -10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--dxr), 115vh) rotate(var(--rotr)); opacity: 0.85; }
+}
+.confetti-rain-bit {
+  position: absolute; top: 0; width: var(--sz); height: var(--sz);
+  background: var(--col); border-radius: var(--rad);
+  animation: confettiRain var(--dur) linear forwards;
+  will-change: transform, opacity;
+}
+@keyframes rocketLaunch {
+  0%   { transform: translate(-50%, 40vh) rotate(0deg) scale(.4); opacity: 0; }
+  15%  { opacity: 1; }
+  70%  { transform: translate(-50%, -30vh) rotate(-8deg) scale(1.05); opacity: 1; }
+  100% { transform: translate(-50%, -60vh) rotate(-8deg) scale(.85); opacity: 0; }
+}
+.rocket-emoji {
+  position: fixed; left: 50%; bottom: 20%; font-size: 2.6rem; z-index: 901;
+  animation: rocketLaunch 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  will-change: transform, opacity;
+}
+.bnb-icon { width: 1.35em; height: 1.35em; vertical-align: -0.24em; display: inline-block; flex-shrink: 0; }
+.field-fade { animation: fadeSlideUp .3s cubic-bezier(.2,.8,.2,1); }
+.check-burst {
+  width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle, rgba(200,242,77,.22) 0%, rgba(200,242,77,.06) 70%);
+  box-shadow: 0 0 0 1px rgba(200,242,77,.3), 0 0 24px rgba(200,242,77,.25);
+  animation: checkPop .45s cubic-bezier(.2,1.4,.4,1);
+}
+.check-burst svg { width: 26px; height: 26px; }
+.check-burst svg path {
+  stroke-dasharray: 24; stroke-dashoffset: 24;
+  animation: checkDraw .35s .15s ease forwards;
+}
+@keyframes checkPop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes checkDraw { to { stroke-dashoffset: 0; } }
+</style>
+</head>
+<body>
+
+<div class="mesh-bg" aria-hidden="true">
+  <div class="blob lime-1"></div>
+  <div class="blob amber-1"></div>
+  <div class="blob lime-2"></div>
+  <div class="blob amber-2"></div>
+  <div class="blob core"></div>
+</div>
+
+<div id="splash">
+  <div class="splash-mark">
+    <span class="ping"></span><span class="ping"></span>
+    <div class="core">HF</div>
+    <div class="splash-ring"></div>
+  </div>
+  <div class="splash-word">HF <span>EARN</span></div>
+  <div class="splash-track"><i></i></div>
+  <div class="splash-sub">Dashboard</div>
+</div>
+
+<div id="gate" style="display:none">
+  <div class="gate-head">
+    <div class="gate-badge">📢</div>
+    <h1>Join to Continue</h1>
+    <p>Please join the channel(s) below, then tap "I've Joined" to unlock your dashboard.</p>
+  </div>
+  <div id="gateList"></div>
+  <div id="gateFooter">
+    <button class="btn gold" id="gateRecheckBtn" onclick="recheckGate()">✅ I've Joined</button>
+  </div>
+</div>
+
+<div id="notTg" style="display:none">
+  <div class="notg-badge">✈️</div>
+  <h1 class="notg-h1">Open in Telegram</h1>
+  <p class="notg-p">This app only works inside Telegram. It looks like it was opened in a regular browser — tap below to go back to the bot.</p>
+  <a class="notg-btn" id="openInTgBtn" href="#" target="_blank">📲 Open in Telegram</a>
+</div>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>HF Earn money v4</div>
+    <div class="bal-chip" id="topBal">— Birr</div>
+  </div>
+  <div id="view"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="navbar" id="navbar">
+  <button class="nav-btn active" data-tab="home"><span class="ic">🏠</span>Home</button>
+  <button class="nav-btn" data-tab="tasks"><span class="ic">🧩</span>Tasks</button>
+  <button class="nav-btn" data-tab="invite"><span class="ic">🔗</span>Invite</button>
+  <button class="nav-btn" data-tab="withdraw"><span class="ic">💸</span>Withdraw</button>
+  <button class="nav-btn" id="adminNavBtn" data-tab="admin" style="display:none"><span class="ic">⚙️</span>Admin</button>
+</div>
+
+<button class="support-fab" id="supportFab" style="display:none" title="Contact Support">👨‍🔧</button>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="config.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   SETUP
+   ══════════════════════════════════════════════════════════════════ */
+const tg = window.Telegram?.WebApp || null;
+if (tg) { tg.ready(); tg.expand(); }
+const initData = tg?.initData || "";
+const _p = new URLSearchParams(location.search);
+const FORCE_ADMIN_TAB = _p.get("admin") === "1";
+
+let ME = null;
+let ADS = null;
+let DAILY = null; // /api/dailycheck/status
+let _homeNeedsIntro = true; // consumed once per switch INTO home — see switchTab()/renderHome()
+let _skipNextMeRefetch = false; // set right before the boot render() call that's about to consume it — see bottom of file / renderHome()
+
+/* Counts #balanceNum up (or down) from oldValue to newValue — a real
+   spinning-odometer style tally, not just a two-frame slide. No-op if
+   there's no previous value (first load) or nothing changed. */
+function rollBalanceTo(oldValue, newValue){
+  const el = document.getElementById("balanceNum");
+  if (!el || !Number.isFinite(oldValue) || oldValue === newValue) return;
+  const from = Number(oldValue) || 0;
+  const to = Number(newValue) || 0;
+  const duration = 900;
+  const start = performance.now();
+  function tick(now){
+    const progress = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic — fast start, settles gently
+    el.textContent = fmt(from + (to - from) * eased);
+    if (progress < 1) requestAnimationFrame(tick);
+    else el.textContent = fmt(to);
+  }
+  requestAnimationFrame(tick);
+}
+let UTC = null; // user_task_config from /api/tasks
+let adController = null;
+
+/* ── Real "left the app for the ad's banner" detection ──────────────
+   AdsGram's SDK promise only tells us the PLAYER finished — it can't
+   prove the person actually left the app for a banner/link inside the
+   ad. What we *can* detect is Telegram's WebApp actually being
+   backgrounded (blur / visibilitychange) while an ad is showing, which
+   is real evidence they tapped through to a browser/other bot/channel.
+   armBannerClickWatch() arms a one-shot listener for the duration of a
+   single ad session; disarmBannerClickWatch() removes it once the
+   session ends either way. */
+let _bannerClickArmed = false;
+let _bannerClickRAF = null;
+let _bannerClickPollTimer = null;
+let _bannerClickLastTick = 0;
+
+/* Regular fetch() can get silently cancelled by the browser mid-flight
+   if the page is in the process of being torn down — exactly what
+   happens when an ad's creative is itself a Mini App link: Telegram
+   swaps this WebView out so fast that our normal api() call to
+   /api/ads/mark-clicked never finishes, even though the pagehide/blur
+   signal itself fired correctly. sendBeacon exists specifically for
+   this — the browser guarantees the request is dispatched even during
+   unload, so it's used here instead of api() for every reason, not
+   just the unload-y ones, since it's strictly more reliable and still
+   fire-and-forget either way. */
+function _sendClickSignalBeacon(){
+  const payload = JSON.stringify({ initData });
+  const url = `${BACKEND_URL}/api/ads/mark-clicked`;
+  let sent = false;
+  if (navigator.sendBeacon){
+    try {
+      sent = navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+    } catch (e) { sent = false; }
+  }
+  if (!sent){
+    // sendBeacon unavailable or the browser refused it (payload too
+    // large, etc. — won't happen here) — fall back to a normal call.
+    api("/api/ads/mark-clicked", {}).catch(() => {});
+  }
+}
+
+function _onPossibleBannerClick(reason){
+  if (!_bannerClickArmed) return;
+  _bannerClickArmed = false;
+  _sendClickSignalBeacon(); // best-effort, never blocks, survives page teardown
+}
+
+/* Some AdsGram creatives are themselves Telegram Mini Apps: tapping one
+   opens the target Mini App as an overlay INSIDE the same Telegram
+   client, rather than backgrounding this page for an external browser.
+   On several platforms (notably Desktop and some Android builds) that
+   overlay switch never fires blur/visibilitychange/pagehide at all, so
+   a real tap-through was silently going uncounted. These two extra,
+   independent signals catch that case without needing any of those
+   events:
+     - RAF heartbeat: if JS execution is actually suspended (true
+       backgrounding), requestAnimationFrame stops ticking; a large gap
+       between ticks once it resumes proves we were away.
+     - document.hidden / document.hasFocus() polling: catches cases
+       where visibilitychange itself doesn't fire but the page is
+       still hidden, or where a native system dialog (e.g. Telegram's
+       own "Open <bot>? Cancel/Open" prompt for a t.me deep link inside
+       an ad) steals input focus without hiding/backgrounding the page
+       at all. */
+function _armBannerClickRAF(){
+  _bannerClickLastTick = performance.now();
+  const tick = (t) => {
+    if (!_bannerClickArmed) return;
+    if (t - _bannerClickLastTick > 700) {
+      _onPossibleBannerClick("raf-gap");
+      return;
+    }
+    _bannerClickLastTick = t;
+    _bannerClickRAF = requestAnimationFrame(tick);
+  };
+  _bannerClickRAF = requestAnimationFrame(tick);
+}
+function _armBannerClickPoll(){
+  _bannerClickPollTimer = setInterval(() => {
+    if (!_bannerClickArmed){
+      clearInterval(_bannerClickPollTimer);
+      return;
+    }
+    // document.hidden catches real backgrounding. document.hasFocus()
+    // catches a narrower but real case: some Telegram clients show the
+    // native "Open <bot>? Cancel/Open" prompt (the one that fires when
+    // an ad's creative is itself a t.me deep link) as a system overlay
+    // that steals input focus WITHOUT hiding or backgrounding the page
+    // — so hidden/visibilitychange/blur/freeze can all stay silent
+    // while hasFocus() still correctly flips to false.
+    if (document.hidden) _onPossibleBannerClick("hidden-poll");
+    else if (!document.hasFocus()) _onPossibleBannerClick("focus-poll");
+  }, 250);
+}
+const _onBlur = () => _onPossibleBannerClick("blur");
+const _onVisibility = () => _onPossibleBannerClick("visibilitychange");
+const _onPagehide = () => _onPossibleBannerClick("pagehide");
+const _onFreeze = () => _onPossibleBannerClick("freeze");
+function armBannerClickWatch(){
+  _bannerClickArmed = true;
+  window.addEventListener("blur", _onBlur);
+  document.addEventListener("visibilitychange", _onVisibility);
+  window.addEventListener("pagehide", _onPagehide);
+  document.addEventListener("freeze", _onFreeze); // Page Lifecycle API, Chromium-based webviews
+  _armBannerClickRAF();
+  _armBannerClickPoll();
+}
+function disarmBannerClickWatch(){
+  _bannerClickArmed = false;
+  window.removeEventListener("blur", _onBlur);
+  document.removeEventListener("visibilitychange", _onVisibility);
+  window.removeEventListener("pagehide", _onPagehide);
+  document.removeEventListener("freeze", _onFreeze);
+  if (_bannerClickRAF) cancelAnimationFrame(_bannerClickRAF);
+  if (_bannerClickPollTimer) clearInterval(_bannerClickPollTimer);
+  _bannerClickRAF = null;
+  _bannerClickPollTimer = null;
+}
+/* AdsGram's show() promise can resolve the instant the user taps a
+   Mini-App creative — the overlay closes itself right away, before the
+   resulting blur/visibilitychange/freeze event actually arrives (it's
+   asynchronous and can lag a beat behind). Disarming synchronously in
+   the finally block right after show() was tearing the listeners down
+   before that late signal could land. Keep them armed a couple extra
+   seconds after the ad "ends" to catch it. */
+function disarmBannerClickWatchDelayed(ms = 2000){
+  setTimeout(disarmBannerClickWatch, ms);
+}
+
+function toast(msg, type, opts){
+  if (!type){
+    if (/^(✅|🎉)/.test(msg)) type = "success";
+    else if (/^(❌|🚫|⚠️)/.test(msg)) type = "error";
+    else type = "info";
+  }
+  const icons = { success: "✓", error: "✕", info: "i", loading: '<span class="spin-ico"></span>' };
+  const t = document.getElementById("toast");
+  clearTimeout(t._h);
+  // If a toast is already on screen, swap its content in place and keep
+  // it visible — removing then re-adding "show" here retriggered the
+  // slide/fade-in transition on every single message change (which
+  // happens a lot mid-flow: "Confirming…" → "Still confirming…" →
+  // result), and interrupting that bouncy transform transition a couple
+  // frames in was exactly what looked like a "flicker". Only play the
+  // entrance transition when actually going from hidden → visible.
+  const wasShowing = t.classList.contains("show");
+  t.className = "toast " + type + (wasShowing ? " show" : "");
+  t.innerHTML = `<span class="t-ic">${icons[type]}</span><span class="t-msg">${escapeHtml(msg)}</span>`;
+  if (!wasShowing){
+    requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add("show")));
+  }
+  if (!opts?.sticky){
+    const duration = opts?.duration || (type === "error" ? 9000 : 2600);
+    t._h = setTimeout(() => t.classList.remove("show"), duration);
+  }
+}
+
+/* ── Claim celebration: confetti burst + a little rocket 🚀 ─────────
+   Purely cosmetic, self-cleaning (removes its own DOM nodes), and kept
+   lightweight (small particle count, transform/opacity-only animation)
+   so it stays smooth even on low-end phones. Call celebrateBurst() right
+   when a reward is credited (daily check-in, ad watch, task claim...). */
+function celebrateBurst(){
+  let layer = document.getElementById("confettiLayer");
+  if (!layer){
+    layer = document.createElement("div");
+    layer.id = "confettiLayer";
+    document.body.appendChild(layer);
+  }
+
+  const colors = ["#c8f24d", "#ffd166", "#ff6b6b", "#4dd6ff", "#c084fc", "#ffffff"];
+  const originX = window.innerWidth / 2;
+  const originY = window.innerHeight * 0.62;
+  const count = 22;
+
+  for (let i = 0; i < count; i++){
+    const bit = document.createElement("div");
+    bit.className = "confetti-bit";
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 90 + Math.random() * 130;
+    bit.style.setProperty("--dx", `${Math.cos(angle) * dist}px`);
+    bit.style.setProperty("--dy", `${Math.sin(angle) * dist - 40}px`);
+    bit.style.setProperty("--rot", `${(Math.random() * 480 - 240).toFixed(0)}deg`);
+    bit.style.setProperty("--sz", `${5 + Math.random() * 6}px`);
+    bit.style.setProperty("--rad", Math.random() > 0.5 ? "50%" : "2px");
+    bit.style.setProperty("--dur", `${(700 + Math.random() * 500).toFixed(0)}ms`);
+    bit.style.setProperty("--col", colors[i % colors.length]);
+    bit.style.left = `${originX}px`;
+    bit.style.top = `${originY}px`;
+    layer.appendChild(bit);
+    bit.addEventListener("animationend", () => bit.remove());
+    setTimeout(() => bit.remove(), 1400); // safety net in case animationend never fires
+  }
+
+  const rocket = document.createElement("div");
+  rocket.className = "rocket-emoji";
+  rocket.textContent = "🚀";
+  document.body.appendChild(rocket);
+  rocket.addEventListener("animationend", () => rocket.remove());
+  setTimeout(() => rocket.remove(), 1400);
+
+  // Falling "rain" of confetti from the top of the screen, on top of the
+  // center burst above — pieces spawn across the full width and drift
+  // down with a slight rotation, like scattered confetti raining down.
+  const rainCount = 28;
+  for (let i = 0; i < rainCount; i++){
+    const bit = document.createElement("div");
+    bit.className = "confetti-rain-bit";
+    bit.style.left = `${Math.random() * 100}%`;
+    bit.style.setProperty("--dxr", `${(Math.random() * 60 - 30).toFixed(0)}px`);
+    bit.style.setProperty("--rotr", `${(Math.random() * 720 - 360).toFixed(0)}deg`);
+    bit.style.setProperty("--sz", `${5 + Math.random() * 6}px`);
+    bit.style.setProperty("--rad", Math.random() > 0.5 ? "50%" : "2px");
+    bit.style.setProperty("--dur", `${(1600 + Math.random() * 900).toFixed(0)}ms`);
+    bit.style.setProperty("--col", colors[i % colors.length]);
+    bit.style.animationDelay = `${(Math.random() * 300).toFixed(0)}ms`;
+    layer.appendChild(bit);
+    bit.addEventListener("animationend", () => bit.remove());
+    setTimeout(() => bit.remove(), 3200); // safety net in case animationend never fires
+  }
+
+  tg?.HapticFeedback?.notificationOccurred("success");
+}
+
+async function api(path, body = {}) {
+  const r = await fetch(`${BACKEND_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData, ...body }),
+  });
+  if (!r.ok) {
+    let detail = "error";
+    try { detail = (await r.json()).detail || detail; } catch {}
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
+function fmt(n){ return Number(n || 0).toFixed(2); }
+// Simple recreation of the Binance diamond mark (brand yellow #F0B90B) used
+// wherever we identify the Binance Pay payout method in the UI.
+const BINANCE_ICON_SVG = `<svg class="bnb-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g stroke="#1A0E00" stroke-width="3" stroke-linejoin="round">
+    <polygon points="50,30 70,50 50,70 30,50" fill="#F0B90B"/>
+    <polygon points="50,2 66,18 50,34 34,18" fill="#F0B90B"/>
+    <polygon points="50,66 66,82 50,98 34,82" fill="#F0B90B"/>
+    <polygon points="2,50 18,34 34,50 18,66" fill="#F0B90B"/>
+    <polygon points="66,50 82,34 98,50 82,66" fill="#F0B90B"/>
+  </g>
+</svg>`;
+
+/* ══════════════════════════════════════════════════════════════════
+   NAV
+   ══════════════════════════════════════════════════════════════════ */
+const views = {};
+let currentTab = "home";
+
+document.getElementById("navbar").addEventListener("click", (e) => {
+  const btn = e.target.closest(".nav-btn");
+  if (!btn) return;
+  switchTab(btn.dataset.tab);
+});
+
+// Global tactile ripple on every .btn AND nav-btn across the whole app
+// (Home, Tasks, Invite, Withdraw, Admin, + the bottom nav bar) — one
+// delegated listener, works automatically on buttons rendered later too,
+// no per-view wiring needed.
+document.addEventListener("pointerdown", (e) => {
+  const btn = e.target.closest(".btn, .nav-btn");
+  if (!btn || btn.disabled) return;
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 1.4;
+  const ripple = document.createElement("span");
+  ripple.className = "ripple";
+  ripple.style.width = ripple.style.height = size + "px";
+  ripple.style.left = (e.clientX - rect.left - size / 2) + "px";
+  ripple.style.top = (e.clientY - rect.top - size / 2) + "px";
+  btn.appendChild(ripple);
+  ripple.addEventListener("animationend", () => ripple.remove());
+});
+
+function switchTab(tab){
+  // Arriving at Home from a different tab (or the very first load, via
+  // the initial true above) is the one case that should replay the
+  // nice hero-card entrance animation. An in-place refresh while
+  // already sitting on Home (ad watch, check-in claim, an error retry)
+  // does NOT go through here — it calls renderHome() directly — so it
+  // never re-arms this flag and stays flicker-free.
+  if (tab === "home" && currentTab !== "home") _homeNeedsIntro = true;
+  currentTab = tab;
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  render();
+  tg?.HapticFeedback?.impactOccurred("light");
+}
+
+function skeletonFor(tab){
+  if (tab === "home") return `
+    <div class="skel skel-hero"></div>
+    <div class="row2" style="margin-bottom:12px">
+      <div class="skel" style="height:46px;border-radius:13px"></div>
+      <div class="skel" style="height:46px;border-radius:13px"></div>
+    </div>
+    <div class="skel skel-line" style="width:40%"></div>
+    <div class="skel skel-card"></div>`;
+  if (tab === "tasks") return `
+    <div class="skel skel-line" style="width:50%"></div>
+    <div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div>`;
+  return `<div class="skel skel-line" style="width:45%"></div><div class="skel skel-card"></div><div class="skel skel-card"></div>`;
+}
+
+async function render(){
+  const view = document.getElementById("view");
+  view.classList.remove("tab-fade");
+  view.innerHTML = skeletonFor(currentTab);
+  try {
+    if (currentTab === "home")     await renderHome(view);
+    if (currentTab === "tasks")    await renderTasks(view);
+    if (currentTab === "invite")   await renderInvite(view);
+    if (currentTab === "withdraw") await renderWithdraw(view);
+    if (currentTab === "admin")    await renderAdmin(view);
+  } catch (e) {
+    view.innerHTML = `<div class="empty">⚠️ Couldn't load this. ${e.message === "banned" ? "Your account is banned." : "Pull to retry."}</div>`;
+  }
+  // Force a reflow so the animation reliably re-triggers even though the
+  // class name is the same as last time — smooths the swap into each tab.
+  void view.offsetWidth;
+  view.classList.add("tab-fade");
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   HOME
+   ══════════════════════════════════════════════════════════════════ */
+async function refreshMe(){
+  ME = await api("/api/me");
+  document.getElementById("topBal").textContent = `${fmt(ME.balance)} Birr`;
+  document.getElementById("adminNavBtn").style.display = ME.is_admin ? "flex" : "none";
+  document.getElementById("supportFab").style.display = ME.support_username ? "flex" : "none";
+  return ME;
+}
+function openSupport(){
+  if (!ME || !ME.support_username) return;
+  const url = `https://t.me/${ME.support_username}`;
+  tg?.openTelegramLink ? tg.openTelegramLink(url) : window.open(url, "_blank");
+}
+document.getElementById("supportFab").addEventListener("click", openSupport);
+
+async function renderHome(view){
+  const prevBalanceValue = (ME && document.getElementById("balanceNum")) ? Number(ME.balance) : null;
+  // These three were previously three separate sequential round-trips on
+  // every single Home render (including the very first paint after
+  // opening the Mini App) — that serial latency is what read as a heavy/
+  // congested open. Running them together cuts it to roughly one
+  // round-trip's worth of wait instead of three stacked back to back.
+  // The very first call after boot also skips re-fetching ME entirely:
+  // the boot sequence (see the bottom of this file) already fetched it
+  // moments earlier to check the gate, so this would otherwise be an
+  // outright duplicate network call for no new data.
+  if (_skipNextMeRefetch && ME){
+    _skipNextMeRefetch = false;
+    const [ads, daily] = await Promise.all([
+      api("/api/ads/status").catch(() => null),
+      api("/api/dailycheck/status", {}).catch(() => null),
+    ]);
+    ADS = ads; DAILY = daily;
+  } else {
+    const [, ads, daily] = await Promise.all([
+      refreshMe(),
+      api("/api/ads/status").catch(() => null),
+      api("/api/dailycheck/status", {}).catch(() => null),
+    ]);
+    ADS = ads; DAILY = daily;
+  }
+  ensureMonetagSdk();
+  ensureAdsgramSdk(); // pre-warm in the background — non-blocking, unlike the old <script> tag
+  if (ADS?.tads?.enabled) ensureTadsSdk();
+  // Full intro (blur/scale/perspective + staggered per-card cascade) only
+  // on the very first paint. Every later call — after watching an ad,
+  // claiming check-in, an error, anything — reuses the same rebuild but
+  // with a quick, un-staggered fade instead, so it reads as an update
+  // rather than the whole tab reloading from scratch.
+  // No whole-card animation on refresh anymore — that read as flashing
+  // however it was tuned. The balance number's own roll (below) is now
+  // the only motion an update shows; everything else just appears as-is.
+  const introClasses = _homeNeedsIntro ? "dashboard-enter cascade" : "";
+  _homeNeedsIntro = false;
+  view.innerHTML = `
+    <div class="${introClasses}">
+    <div class="hero">
+      <div class="hero-top">
+        <div class="chip"></div>
+        <div class="netmark">HF Earn money v4</div>
+      </div>
+      <div class="label">Available Balance</div>
+      <div class="amount"><span id="balanceNum">${fmt(ME.balance)}</span><span class="unit">Birr</span></div>
+      <div class="sub">MIN. WITHDRAWAL ${fmt(ME.min_withdrawal)} BIRR</div>
+      <div class="stat-row">
+        <div class="stat-box"><div class="n">${ME.referrals}</div><div class="l">Referrals</div></div>
+        <div class="stat-box"><div class="n">${fmt(ME.reward_per_referral)}</div><div class="l">Per Invite</div></div>
+        <div class="stat-box"><div class="n">${fmt(ME.total_earned_refs)}</div><div class="l">Earned</div></div>
+      </div>
+    </div>
+    <div class="row2">
+      <button class="btn gold" onclick="switchTab('tasks')">🧩 Do Tasks</button>
+      <button class="btn ghost" onclick="switchTab('invite')">🔗 Invite Friends</button>
+    </div>
+    ${dailyCheckCardHTML()}
+    ${adsCardHTML()}
+    <h2 class="sect">Quick Actions</h2>
+    <div class="card" style="display:flex;flex-direction:column;gap:8px;padding-right:64px;">
+      <button class="btn ghost" onclick="switchTab('withdraw')">💸 Request Withdrawal</button>
+    </div>
+    </div>
+  `;
+  // Start the cooldown ticker when EITHER rewarded video OR the Direct
+  // Link flow is live. Gating on ADS.enabled alone (which requires a
+  // video block_id / Monetag zone) meant Direct-Link-only setups never
+  // showed their cooldown countdown — the button looked tappable and
+  // every tap failed with the backend's cooldown_active (BUG-REPORT #14).
+  if (ADS?.enabled || ADS?.direct_link?.enabled) startAdCooldownTicker();
+  rollBalanceTo(prevBalanceValue, Number(ME.balance));
+}
+
+/* ── Daily Check-in (watch one ad, then claim a once-a-day bonus) ─── */
+function dailyCheckCardHTML(){
+  if (!DAILY || !DAILY.enabled) return "";
+  const claimed = DAILY.claimed_today;
+  return `
+    <h2 class="sect">Daily Check-in</h2>
+    <div class="card reward-card gold" id="dailyCheckCard">
+      <div class="reward-head">
+        <div class="icon-badge gold">🎁</div>
+        <div class="reward-info">
+          <div class="reward-title">Daily Bonus</div>
+          <div class="mini" style="margin-top:2px">🔥 ${DAILY.streak}-day streak · watch a short ad for +${fmt(DAILY.reward)} Birr</div>
+        </div>
+        <button class="btn gold pill" id="dailyCheckBtn" onclick="dailyCheckIn()" ${claimed ? "disabled" : ""}>
+          ${claimed ? "Claimed" : "🎁 Check In"}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function dailyCheckIn(){
+  if (!ADS?.block_id && !ADS?.monetag?.zone_id){
+    return toast("❌ Ads not configured yet");
+  }
+  const btn = document.getElementById("dailyCheckBtn");
+  if (btn){ btn.disabled = true; btn.innerHTML = '<span class="spin-ico"></span> Loading…'; }
+
+  // Tell the backend the ad we're about to show is for Daily Check-in,
+  // so its AdsGram S2S postback doesn't ALSO pay the regular per-view
+  // ad_reward_amount on top of the daily bonus below (see
+  // /api/dailycheck/arm). This is also the real, server-side guard
+  // against repeat check-in ad views for the day — the button being
+  // disabled is just local UI state (stale after a reload, a second
+  // tab, or a fast double-tap), so if the backend says today's
+  // check-in is already claimed, stop right here and don't show an ad
+  // at all, instead of only discovering that after watching one.
+  try {
+    await api("/api/dailycheck/arm", {});
+  } catch (e) {
+    if (e.message === "already_claimed"){
+      DAILY = { ...(DAILY || {}), claimed_today: true };
+      toast("✅ You already checked in today — come back tomorrow!");
+      await renderHome(document.getElementById("view"));
+      return;
+    }
+    // Any other arm failure: best-effort, still let the attempt proceed
+    // (matches previous behavior) — worst case this one view doesn't
+    // get the double-payment fix applied to it.
+  }
+
+  let watched = false;
+  await waitForAdsgramSdk();
+  if (ADS?.block_id && window.Adsgram){
+    if (!adController){
+      adController = window.Adsgram.init({ blockId: ADS.block_id });
+      const noAdsMsg = () => {};
+      adController.addEventListener("onBannerNotFound", noAdsMsg);
+      adController.addEventListener("onNonStopShow",    noAdsMsg);
+      adController.addEventListener("onTooLongSession",  noAdsMsg);
+      adController.addEventListener("onReward",         () => { watched = true; });
+      adController.addEventListener("onComplete",       () => { watched = true; });
+    }
+    armBannerClickWatch();
+    try {
+      await adController.show();
+      watched = true;
+    } catch (adErr) {
+      if (adErr?.state !== "load" && adErr?.state !== "render"){
+        disarmBannerClickWatch();
+        toast("⚠️ Ad not completed — no bonus");
+        if (btn){ btn.disabled = false; btn.textContent = "🎁 Check In"; }
+        return;
+      }
+    } finally {
+      disarmBannerClickWatchDelayed();
+    }
+  }
+
+  if (!watched){
+    // Monetag fallback (BUG-REPORT #12): same wiring as Watch & Earn —
+    // try the configured Monetag zone before dead-ending. If Monetag
+    // completes, fall through to the claim below; the backend still only
+    // pays the bonus against an AdsGram S2S-confirmed check-in view
+    // (its anti-double-dip trust model), so a Monetag-only view shows
+    // the ad but the claim will answer with the reminder text rather
+    // than crediting — documented in UPDATES.md.
+    if (ADS?.monetag?.zone_id){
+      ensureMonetagSdk();
+      for (let i = 0; i < 10 && typeof window[`show_${ADS.monetag.zone_id}`] !== "function"; i++){
+        await new Promise(r => setTimeout(r, 300));
+      }
+      watched = await tryMonetagFallback();
+    }
+    if (!watched){
+      toast("⌛ No ads available right now — please try again later");
+      if (btn){ btn.disabled = false; btn.textContent = "🎁 Check In"; }
+      return;
+    }
+  }
+
+  // Note: this deliberately does NOT check the regular Watch & Earn
+  // odd/even click-reminder parity (will_pay_next) before polling —
+  // that counter is irrelevant here. The backend's Daily Check-in ad
+  // completion (skip_balance_credit=True in claim_video_ad_atomic)
+  // bypasses the odd/even withholding rule entirely and always records
+  // a completed view, so checking that parity here only produced false
+  // "you must click the ad" warnings — most visibly on a fresh day
+  // before any regular ad had been watched, when the very first
+  // attempt (odd) made this always short-circuit and skip claiming.
+
+  // Same trust model as the regular Watch Ad flow: wait for AdsGram's
+  // server-to-server postback to actually land (has_recent_completed_ad
+  // on the backend), rather than trusting the player finishing.
+  // AdsGram's own postback timing is out of our control — sometimes it
+  // lands in 2s, sometimes 30-60s+ (confirmed from real logs) — so this
+  // waits it out generously (up to ~24s) instead of giving up early and
+  // making an honest viewer re-watch a whole second ad for nothing.
+  let claimed = false;
+  let claimedReward = DAILY?.reward ?? 0;
+  let streak = DAILY?.streak ?? 0;
+  const dcAttempts = 12; // ~2s apart ≈ 24s ceiling
+  for (let i = 0; i < dcAttempts; i++){
+    if (i === 0) toast("⏳ Confirming your ad view…", "loading", { sticky: true });
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const r = await api("/api/dailycheck/claim", {});
+      claimedReward = r.reward;
+      streak = r.streak;
+      DAILY = { enabled: true, reward: r.reward, claimed_today: true, streak: r.streak };
+      const topBal = document.getElementById("topBal");
+      if (topBal) topBal.textContent = `${fmt(r.balance)} Birr`;
+      claimed = true;
+      break;
+    } catch (e) {
+      if (e.message === "already_claimed"){
+        claimed = true;
+        break;
+      }
+      // "watch_ad_first" — postback hasn't landed yet, keep polling
+    }
+  }
+
+  if (claimed){
+    celebrateBurst();
+    tg?.HapticFeedback?.notificationOccurred("success");
+    toast(`✅ +${fmt(claimedReward)} Birr — 🔥 ${streak} day streak!`);
+  } else {
+    toast(DAILY?.reminder_text || "⚠️ Couldn't confirm your ad view — try again in a moment");
+  }
+  await renderHome(document.getElementById("view"));
+}
+
+/* ── Rewarded ads (AdsGram) ─────────────────────────────────────── */
+function adsCardHTML(){
+  if (!ADS || (!ADS.block_id && !ADS.monetag?.zone_id && !ADS.direct_link?.url)) return "";
+
+  const videoBlock = (ADS.block_id || ADS.monetag?.zone_id) ? (() => {
+    const capped = ADS.watched_today >= ADS.daily_limit;
+    const pct = ADS.daily_limit ? Math.min(100, Math.round((ADS.watched_today / ADS.daily_limit) * 100)) : 0;
+    return `
+      <div class="reward-head">
+        <div class="icon-badge lime">🎬</div>
+        <div class="reward-info">
+          <div class="reward-title">Watch & Earn</div>
+          <div class="mini" style="margin-top:2px">Earn ${fmt(ADS.reward_amount)} Birr per view</div>
+        </div>
+        <div class="mini" id="adsWatchedCounter" data-val="${ADS.watched_today}" style="font-family:'JetBrains Mono',monospace;color:var(--lime)">${ADS.watched_today}/${ADS.daily_limit}</div>
+      </div>
+      <div class="mini-progress-track"><div class="mini-progress-fill" id="adsProgressFill" style="width:${pct}%"></div></div>
+      <button class="btn" id="watchAdBtn" onclick="watchAd()" style="margin-top:14px" ${(!ADS.enabled || capped) ? "disabled" : ""}>
+        ${capped ? "✅ Daily Limit Reached" : "▶️ Watch Ad"}
+      </button>
+    `;
+  })() : "";
+
+  const dl = ADS.direct_link;
+  const directLinkBlock = (dl && dl.url) ? (() => {
+    const dlCapped = dl.watched_today >= dl.daily_limit;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:${videoBlock ? "16px" : "0"} 0 12px;">
+        <div>
+          <div style="font-weight:700;font-size:.86rem">🔗 Direct Link Ad</div>
+          <div class="mini" style="margin-top:2px">Earn ${fmt(dl.reward_amount)} Birr per visit</div>
+        </div>
+        <div class="mini" style="font-family:'JetBrains Mono',monospace;color:var(--lime)">${dl.watched_today}/${dl.daily_limit}</div>
+      </div>
+      <button class="btn ghost" id="directLinkBtn" onclick="openDirectLinkAd()" ${(!dl.enabled || dlCapped) ? "disabled" : ""}>
+        ${dlCapped ? "✅ Daily Limit Reached" : "🔗 Open Direct Link"}
+      </button>
+    `;
+  })() : "";
+
+  return `
+    <h2 class="sect">Watch & Earn</h2>
+    <div class="card reward-card lime" id="adsCard">
+      ${videoBlock}${directLinkBlock}
+    </div>
+  `;
+}
+
+function _fmtCountdown(totalSeconds){
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  if (m > 0) return `${m}:${String(s).padStart(2, "0")}`;
+  return `${s}s`;
+}
+
+function startAdCooldownTicker(justWatched = false){
+  clearInterval(window._adTick);
+  // Daily limit reached overrides everything — a leftover cooldown/batch
+  // countdown from before the last ad that hit the cap is irrelevant now,
+  // and must not un-disable a button that adsCardHTML() correctly locked.
+  const videoCapped = ADS && (ADS.watched_today ?? 0) >= (ADS.daily_limit ?? Infinity);
+  if (ADS && ADS.seconds_left > 0 && !videoCapped){
+    let left = ADS.seconds_left;
+    const isBatch = !!ADS.is_batch_wait;
+    // Schedule the bonus Monetag ad once per cooldown, timed for ~15s
+    // left — persists via localStorage so it survives tab switches AND a
+    // full app close (see scheduleMonetagCatchup above), instead of being
+    // tied to this on-screen countdown label.
+    //
+    // Only ever scheduled from justWatched=true — i.e. right after this
+    // person actually watched a real, paying Watch & Earn ad
+    // (refreshAdsCardSmooth, right after watchAd()). This function also
+    // runs on every plain Home render (renderHome, e.g. after Daily
+    // Check-in, or a tab switch) just to resume the on-screen countdown
+    // label — those calls must never independently (re)schedule Monetag,
+    // or it ends up tied to an unrelated, non-paying action.
+    if (justWatched && !isBatch && left > 15) scheduleMonetagCatchup((left - 15) * 1000);
+    const btn = document.getElementById("watchAdBtn");
+    if (btn){
+      btn.disabled = true;
+      const label = () => isBatch ? `🕐 Next ads in ${_fmtCountdown(left)}` : `⏳ Wait ${_fmtCountdown(left)}`;
+      btn.textContent = label();
+      window._adTick = setInterval(() => {
+        left -= 1;
+        if (left <= 0){
+          clearInterval(window._adTick);
+          // Re-check the cap rather than blindly re-enabling — a batch
+          // wait that finishes exactly as the daily limit is reached
+          // should land on "Daily Limit Reached", not "Watch Ad".
+          const stillCapped = (ADS.watched_today ?? 0) >= (ADS.daily_limit ?? Infinity);
+          btn.disabled = stillCapped;
+          btn.textContent = stillCapped ? "✅ Daily Limit Reached" : "▶️ Watch Ad";
+        } else {
+          btn.textContent = label();
+        }
+      }, 1000);
+    }
+  }
+
+  clearInterval(window._dlTick);
+  const dl = ADS?.direct_link;
+  const dlCapped = dl && (dl.watched_today ?? 0) >= (dl.daily_limit ?? Infinity);
+  if (dl && dl.seconds_left > 0 && !dlCapped){
+    let left = dl.seconds_left;
+    const btn = document.getElementById("directLinkBtn");
+    if (btn){
+      btn.disabled = true;
+      const label = () => `⏳ Wait ${left}s`;
+      btn.textContent = label();
+      window._dlTick = setInterval(() => {
+        left -= 1;
+        if (left <= 0){
+          clearInterval(window._dlTick);
+          const stillCapped = (dl.watched_today ?? 0) >= (dl.daily_limit ?? Infinity);
+          btn.disabled = stillCapped;
+          btn.textContent = stillCapped ? "✅ Daily Limit Reached" : "🔗 Open Direct Link";
+        } else {
+          btn.textContent = label();
+        }
+      }, 1000);
+    }
+  }
+}
+
+/* ── AdsGram (rewarded video) ───────────────────────────────────────
+   Used to load eagerly in <head> as a blocking <script src>, same as
+   Telegram's own SDK. Unlike Telegram's SDK (which the whole app needs
+   immediately and which is very unlikely to be reachability-blocked,
+   since the Mini App is already running inside Telegram), AdsGram's
+   domain is a 3rd-party ad network — if it's slow or unreachable on a
+   given network without a VPN, a blocking script tag for it stalls the
+   ENTIRE app forever behind it, since nothing after it in the document
+   can run until it resolves. Loaded lazily instead — same pattern as
+   Monetag below — so the rest of the app works regardless of whether
+   AdsGram's domain is reachable; only the ad button itself waits on it.
+   Event-driven (onload/onerror) rather than polling window.Adsgram's
+   truthiness — more reliable, and gives an actual signal for "failed"
+   instead of just silently running out the clock. */
+let _adsgramLoadPromise = null;
+function ensureAdsgramSdk(){
+  if (window.Adsgram) return Promise.resolve(true);
+  if (_adsgramLoadPromise) return _adsgramLoadPromise;
+  _adsgramLoadPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://sad.adsgram.ai/js/sad.min.js";
+    s.onload = () => resolve(!!window.Adsgram);
+    s.onerror = () => { _adsgramLoadPromise = null; resolve(false); };
+    document.head.appendChild(s);
+  });
+  return _adsgramLoadPromise;
+}
+
+/* Waits up to ~8s for the (lazily loaded) AdsGram SDK to become ready,
+   kicking off the load if it hasn't started yet. Returns true/false —
+   callers fall through to whatever they already do when AdsGram isn't
+   available (Monetag fallback, "no ads" message, etc.), same as before;
+   this only avoids treating "hasn't loaded YET" the same as "will never
+   load", which the old blocking <script> tag made someone else's
+   problem entirely. */
+async function waitForAdsgramSdk(timeoutMs = 15000){
+  if (window.Adsgram) return true;
+  const loaded = await Promise.race([
+    ensureAdsgramSdk(),
+    new Promise(r => setTimeout(() => r(false), timeoutMs)),
+  ]);
+  return loaded || !!window.Adsgram;
+}
+
+/* ── Monetag (fallback rewarded network) ───────────────────────────
+   AdsGram's zone/domain is fixed at build time (sad.min.js in <head>),
+   but Monetag's SDK script URL + zone ID are admin-configurable at
+   runtime, so it has to be injected dynamically once we know them. */
+let _monetagLoading = null;
+function ensureMonetagSdk(){
+  const zone = ADS?.monetag?.zone_id;
+  const src  = ADS?.monetag?.sdk_url;
+  if (!zone || !src) return null;
+  const fnName = `show_${zone}`;
+  if (window[fnName]) return fnName; // already loaded
+  if (_monetagLoading === src) return null; // load in flight
+  _monetagLoading = src;
+  const s = document.createElement("script");
+  s.src = src;
+  s.setAttribute("data-zone", zone);
+  s.setAttribute("data-sdk", fnName);
+  document.head.appendChild(s);
+  return null; // not ready on this call; will be ready by the next
+}
+
+/* ── Monetag "bonus ad at ~15s left" catch-up ────────────────────────
+   The plain per-ad cooldown ticker (startAdCooldownTicker) schedules this
+   once per cooldown, timed to fire when ~15s remain. It's a plain
+   setTimeout, so it keeps firing across tab switches within the same app
+   session (switching tabs doesn't kill it) — but a setTimeout dies the
+   instant the person actually closes the Mini App/WebView. localStorage
+   is what survives THAT: the due time is persisted, so on the next app
+   open (resumeMonetagPendingOnLoad, called once at boot — never from
+   watchAd()/the AdsGram button) either the leftover timer is re-armed
+   (still not due yet) or, if already overdue, it's shown right there on
+   its own — deliberately never tied to the "Watch Ad" click, so it can
+   never ride along with (or be mistaken for part of) a genuine AdsGram
+   ad request. */
+const MONETAG_PENDING_KEY = "hf_monetag_due_at";
+
+function scheduleMonetagCatchup(delayMs){
+  if (!(delayMs > 0) || !ADS?.monetag?.zone_id) return;
+  let already;
+  try { already = localStorage.getItem(MONETAG_PENDING_KEY); } catch (e) { already = null; }
+  if (already) return; // already scheduled/pending from this same cooldown
+  const dueAt = Date.now() + delayMs;
+  try { localStorage.setItem(MONETAG_PENDING_KEY, String(dueAt)); } catch (e) {}
+  _armMonetagTimeout(dueAt, delayMs);
+}
+
+function _armMonetagTimeout(dueAt, delayMs){
+  setTimeout(() => {
+    let stored;
+    try { stored = localStorage.getItem(MONETAG_PENDING_KEY); } catch (e) { stored = null; }
+    // Only fire if still the same pending entry — if watchAd() already
+    // caught it up (person reopened the app and pressed the button first),
+    // it will have cleared the key already, so this becomes a no-op.
+    if (stored && Number(stored) === dueAt){
+      clearMonetagPending();
+      _fireMonetagBonus();
+    }
+  }, Math.max(0, delayMs));
+}
+
+// No toast/announcement — Monetag carries no reward, so unlike the
+// AdsGram flow there's nothing worth confirming to the person; it just
+// shows silently. Flicker at open is handled by timing (the delays around
+// this function's callers), not by narrating the ad itself.
+function _fireMonetagBonus(){
+  tryMonetagFallback().catch(() => {});
+}
+
+function clearMonetagPending(){
+  try { localStorage.removeItem(MONETAG_PENDING_KEY); } catch (e) {}
+}
+
+// Called once at app boot. If a Monetag bonus ad was still pending when
+// the person last closed the app, either re-arm the same wait (still not
+// due yet) or, if already overdue, show it now — decoupled from any
+// button. Deliberately NOT tied to the "Watch Ad" click: AdsGram's own
+// show() call must stay a clean, standalone request with nothing else
+// riding along with it, so this never fires as a side effect of that
+// press (avoids anything that could look like ad-stacking/timing
+// interference to AdsGram's own fraud checks).
+function resumeMonetagPendingOnLoad(){
+  let stored;
+  try { stored = localStorage.getItem(MONETAG_PENDING_KEY); } catch (e) { stored = null; }
+  if (!stored) return;
+  const dueAt = Number(stored);
+  const remaining = dueAt - Date.now();
+  if (remaining > 0){
+    _armMonetagTimeout(dueAt, remaining);
+    return;
+  }
+  // Overdue — clear it immediately so nothing else (e.g. a stray re-render)
+  // double-fires it, then wait past both the Monetag SDK script (injected
+  // by ensureMonetagSdk, called from renderHome) loading AND the app's own
+  // open/intro animation, so the bonus ad never lands mid-transition —
+  // that collision is what read as a "breaking"/glitchy flicker right at
+  // open, not the ad itself.
+  clearMonetagPending();
+  setTimeout(() => { _fireMonetagBonus(); }, 5000);
+}
+
+async function tryMonetagFallback(){
+  const zone = ADS?.monetag?.zone_id;
+  if (!zone) return false;
+  const fnName = `show_${zone}`;
+  if (typeof window[fnName] !== "function") return false; // not loaded yet
+  try {
+    await window[fnName]();
+    return true; // ad watched to completion
+  } catch (e) {
+    return false; // no fill / skipped / failed
+  }
+}
+
+/* ── Tads (plain second ad, shown right after AdsGram — no reward) ──
+   Loaded lazily, same reasoning as AdsGram/Monetag above — a 3rd-party
+   ad domain must never be able to stall the rest of the app. Tads is
+   NOT a payout gate: AdsGram alone decides the reward (see the
+   waAttempts loop in watchAd()). Tads' outcome is only reported to
+   /api/ads/tads-result for admin analytics — it never affects balance,
+   so this function's return value is purely informational for the UI
+   (playTadsAsSecondAd doesn't even branch on it). */
+let _tadsLoadPromise = null;
+function ensureTadsSdk(){
+  if (window.tads?.init) return Promise.resolve(true);
+  if (_tadsLoadPromise) return _tadsLoadPromise;
+  _tadsLoadPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://w.tads.me/widget.js";
+    s.onload = () => resolve(!!window.tads?.init);
+    s.onerror = () => { _tadsLoadPromise = null; resolve(false); };
+    document.head.appendChild(s);
+  });
+  return _tadsLoadPromise;
+}
+async function waitForTadsSdk(timeoutMs = 8000){
+  if (window.tads?.init) return true;
+  const loaded = await Promise.race([
+    ensureTadsSdk(),
+    new Promise(r => setTimeout(() => r(false), timeoutMs)),
+  ]);
+  return loaded || !!window.tads?.init;
+}
+
+let tadsController = null;
+/* Shows the Tads gate ad and reports the outcome to the backend.
+   Returns 'completed' (user watched/clicked it — ok to pay),
+   'no_fill' (Tads had nothing to show — ok to pay via AdsGram alone),
+   or 'failed' (Tads had an ad but it wasn't completed — do not pay). */
+async function runTadsGate(){
+  const widgetId = ADS?.tads?.widget_id;
+  if (!ADS?.tads?.enabled || !widgetId) return "no_fill";
+
+  const sdkReady = await waitForTadsSdk();
+  if (!sdkReady || !window.tads?.init){
+    // Tads itself unreachable — treat like no-fill so AdsGram alone can
+    // still pay, rather than blocking every reward on a 3rd-party outage.
+    api("/api/ads/tads-result", { result: "no_fill" }).catch(() => {});
+    return "no_fill";
+  }
+
+  return await new Promise((resolve) => {
+    let settled = false;
+    let noAdsSeen = false; // true only when Tads itself told us there's no ad
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      api("/api/ads/tads-result", { result }).catch(() => {});
+      resolve(result);
+    };
+    try {
+      if (!tadsController){
+        tadsController = window.tads.init({
+          widgetId,
+          type: "fullscreen",
+          debug: false,
+          onShowReward: () => finish("completed"),
+          onAdsNotFound: () => { noAdsSeen = true; finish("no_fill"); },
+        });
+      }
+      const controller = tadsController;
+      // If Tads had an ad but showAd() itself rejects (closed early,
+      // render error, etc.) and onAdsNotFound never fired, that's a
+      // genuine "found but not completed" — must NOT fall back to
+      // no_fill, or the whole gate could be bypassed just by dismissing
+      // the ad immediately.
+      const showIt = (ctrl) => {
+        if (!ctrl || typeof ctrl.showAd !== "function"){
+          return finish("failed");
+        }
+        ctrl.showAd().catch(() => finish(noAdsSeen ? "no_fill" : "failed"));
+      };
+      if (controller && typeof controller.then === "function"){
+        controller.then(showIt).catch(() => finish(noAdsSeen ? "no_fill" : "failed"));
+      } else {
+        showIt(controller);
+      }
+    } catch (e) {
+      finish("failed");
+    }
+    // Safety timeout — if 20s pass and NEITHER onShowReward nor
+    // onAdsNotFound ever fired (widget stuck/never rendered anything),
+    // that's a Tads-side breakdown, not evidence the user dismissed a
+    // real ad — treat it like no_fill so it doesn't block the reward.
+    // This is different from the showAd().catch() paths above, which
+    // still correctly resolve to "failed" when Tads DID have an ad and
+    // the user closed it early.
+    setTimeout(() => finish("no_fill"), 20000);
+  });
+}
+
+// Smoothly counts #adsWatchedCounter from its last shown value up to the
+// new one, instead of the number just snapping — mirrors rollBalanceTo.
+function animateAdsCounter(newWatched){
+  const el = document.getElementById("adsWatchedCounter");
+  if (!el) return;
+  const limit = ADS.daily_limit;
+  const start = parseInt(el.dataset.val || newWatched, 10) || 0;
+  const target = newWatched;
+  const startTime = performance.now();
+  const duration = 420;
+  function step(now){
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const val = Math.round(start + (target - start) * eased);
+    el.textContent = `${val}/${limit}`;
+    if (t < 1){
+      requestAnimationFrame(step);
+    } else {
+      el.textContent = `${target}/${limit}`;
+      el.dataset.val = target;
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+// Updates the existing Watch & Earn card in place (counter, progress bar,
+// button state) instead of tearing down and rebuilding the whole Home tab
+// — that full re-render is what caused the visible "flash" the instant
+// someone returns from an ad. Also pulls a fresh balance and rolls it into
+// the visible numbers live (top bar + Home hero), since skipping the old
+// full renderHome() meant the balance stopped updating until the person
+// switched tabs. Falls back to a full renderHome() only if the person has
+// since navigated away from Home (card no longer in DOM).
+async function refreshAdsCardSmooth(){
+  const card = document.getElementById("adsCard");
+  const btn  = document.getElementById("watchAdBtn");
+  if (!card || !btn || !ADS) return false;
+
+  const prevBalance = ME ? Number(ME.balance) : null;
+  await refreshMe(); // also updates #topBal instantly
+  rollBalanceTo(prevBalance, Number(ME.balance)); // animates #balanceNum if present
+
+  const capped = ADS.watched_today >= ADS.daily_limit;
+  const pct = ADS.daily_limit ? Math.min(100, Math.round((ADS.watched_today / ADS.daily_limit) * 100)) : 0;
+  const fill = document.getElementById("adsProgressFill");
+  if (fill) fill.style.width = pct + "%"; // existing CSS transition animates this smoothly
+  animateAdsCounter(ADS.watched_today ?? 0);
+  btn.disabled = !ADS.enabled || capped;
+  btn.textContent = capped ? "✅ Daily Limit Reached" : "▶️ Watch Ad";
+  // This used to only get (re)armed inside the full renderHome() call we
+  // just removed from this path — without it, the cooldown/batch countdown
+  // stayed frozen until the person switched tabs and back. Restarting it
+  // here is what actually begins the live countdown right away.
+  startAdCooldownTicker(true); // true = a real ad was just watched here, so it's safe to schedule the Monetag bonus
+  return true;
+}
+
+async function watchAd(){
+  if (!ADS?.block_id && !ADS?.monetag?.zone_id){
+    return toast("❌ Ads not configured yet");
+  }
+  const btn = document.getElementById("watchAdBtn");
+
+  api("/api/ads/click", { kind: "video" }).catch(() => {}); // analytics-only, never blocks
+  if (btn){ btn.disabled = true; btn.textContent = "Loading…"; }
+
+  // Baseline, so we can detect the moment AdsGram's server-to-server
+  // postback actually lands (see the polling loop below) rather than
+  // trusting the client SDK's promise for anything financial.
+  const watchedBefore = ADS?.watched_today ?? 0;
+
+  let willPay = true;
+  try {
+    // /api/ads/claim checks if this attempt triggers the click reminder & reward control (2, 4, 6, 8, 10...)
+    const claimRes = await api("/api/ads/claim", {});
+    willPay = claimRes?.will_pay !== false;
+  } catch (claimErr) {
+    const cr = ADS?.click_reminder;
+    const reminderMsg = (!cr || !cr.enabled)
+      ? (cr?.network_text || "⚠️ Network error. Please try again.")
+      : cr.disguised
+        ? (cr.disguise_text || "⚠️ ማስተወቂያውን መንካት አለብዎት! ሪዋርድ ለማግኘት ማስተወቂያው ላይ ክሊክ ማድረግ አለብዎት።")
+        : (cr.text || "ማስታወቂያው ሳይዘጋ እስከሚጨርስ ድረስ ይጠብቁ");
+    const msg = claimErr?.message === "ad_click_reminder"      ? reminderMsg
+              : claimErr?.message === "daily_limit_reached" ? "❌ Daily limit reached"
+              : claimErr?.message === "batch_cooldown_active" ? "🕐 This batch is done — check back after the wait shown on the button"
+              : claimErr?.message === "cooldown_active"     ? "❌ Please wait a bit before the next ad"
+              : "❌ Couldn't start — try again";
+    toast(msg);
+    // daily_limit/batch/cooldown are real "not yet" states, not just a
+    // failed request — re-render so the button reflects the accurate
+    // countdown instead of going back to a tappable state that would
+    // just fail the same way again immediately.
+    if (["daily_limit_reached", "batch_cooldown_active", "cooldown_active"].includes(claimErr?.message)){
+      await renderHome(document.getElementById("view"));
+      return;
+    }
+    if (btn){ btn.disabled = false; btn.textContent = "▶️ Watch Ad"; }
+    return;
+  }
+
+  let watched = false;
+
+  await waitForAdsgramSdk();
+  if (ADS?.block_id && window.Adsgram){
+    if (!adController){
+      adController = window.Adsgram.init({ blockId: ADS.block_id });
+      // Valid Adsgram SDK events only
+      const noAdsMsg = () => {};
+      adController.addEventListener("onBannerNotFound", noAdsMsg);
+      adController.addEventListener("onNonStopShow",    noAdsMsg);
+      adController.addEventListener("onTooLongSession",  noAdsMsg);
+      adController.addEventListener("onReward",         () => { watched = true; });
+      adController.addEventListener("onComplete",       () => { watched = true; });
+    }
+    armBannerClickWatch();
+    try {
+      await adController.show();
+      watched = true;
+    } catch (adErr) {
+      if (adErr?.state === "load" || adErr?.state === "render"){
+        // Transient, not "no fill": the creative was still loading or
+        // rendering the instant show() was called. It very often
+        // finishes loading a moment later — that's exactly the "No ads
+        // available… then an ad shows right away on the next tap"
+        // report. Give it one short retry before giving up on it.
+        await new Promise(r => setTimeout(r, 1500));
+        try {
+          await adController.show();
+          watched = true;
+        } catch (retryErr) {
+          if (retryErr?.state !== "load" && retryErr?.state !== "render"){
+            disarmBannerClickWatch();
+            toast("⚠️ Ad not completed — no reward");
+            if (btn){ btn.disabled = false; btn.textContent = "▶️ Watch Ad"; }
+            await renderHome(document.getElementById("view"));
+            return;
+          }
+          // Still loading/rendering after the retry — fall through to
+          // the Monetag fallback / "no ads available" handling below
+          // instead of a second wait, so this can't stall indefinitely.
+        }
+      } else {
+        disarmBannerClickWatch();
+        toast("⚠️ Ad not completed — no reward");
+        if (btn){ btn.disabled = false; btn.textContent = "▶️ Watch Ad"; }
+        await renderHome(document.getElementById("view"));
+        return;
+      }
+    } finally {
+      disarmBannerClickWatchDelayed();
+    }
+  }
+
+  if (!watched){
+    // Monetag fallback (BUG-REPORT #12): Settings has always promised an
+    // automatic Monetag fallback, but tryMonetagFallback() was never
+    // wired into this flow — an AdsGram no-fill (or a Monetag-only
+    // configuration, where the AdsGram branch above never even runs)
+    // dead-ended here even though a configured fallback network existed.
+    // Try Monetag before giving up. Honest limit: the Birr reward still
+    // only ever comes from AdsGram's S2S postback — Monetag has no
+    // reward postback in this codebase, so a Monetag view fills the
+    // impression but cannot itself credit a reward (see UPDATES.md).
+    let monetagWatched = false;
+    if (ADS?.monetag?.zone_id){
+      ensureMonetagSdk();
+      // The SDK script loads lazily — give its show_<zone> function a
+      // brief chance to appear before declaring the fallback unavailable.
+      for (let i = 0; i < 10 && typeof window[`show_${ADS.monetag.zone_id}`] !== "function"; i++){
+        await new Promise(r => setTimeout(r, 300));
+      }
+      monetagWatched = await tryMonetagFallback();
+    }
+    if (!monetagWatched){
+      toast("⌛ No ads available right now — please try again later");
+      if (btn){ btn.disabled = false; btn.textContent = "▶️ Watch Ad"; }
+      await renderHome(document.getElementById("view"));
+      return;
+    }
+    toast("✅ Ad watched — no paying ad was available this time");
+    if (btn){ btn.disabled = false; btn.textContent = "▶️ Watch Ad"; }
+    await renderHome(document.getElementById("view"));
+    return;
+  }
+
+  // Tads is no longer a payout gate — AdsGram alone decides the reward
+  // (see waAttempts loop below). Tads is shown afterward, independently,
+  // as a plain second ad with no reward and no "confirming" UI of its own.
+
+  // If this attempt was never going to pay (odd-numbered attempt under
+  // the click-reminder rule — predicted above via will_pay), skip the
+  // whole confirmation wait: it can never succeed since claim_video_ad_atomic
+  // will record this as a 'warning', not 'completed', no matter how long
+  // we poll. Show the reminder immediately instead of stalling ~24s for
+  // an outcome we already know.
+  let confirmed = false;
+  if (!willPay){
+    // Resolving this instantly (no wait at all) looked broken/suspicious
+    // to real users — a believable minimum "checking" delay reads as
+    // genuine, even though the outcome was already decided above.
+    toast("⏳ Confirming your ad view…", "loading", { sticky: true });
+    await new Promise(r => setTimeout(r, 2000));
+    const cr = ADS?.click_reminder;
+    const msg = (!cr || !cr.enabled)
+      ? (cr?.network_text || "⚠️ Network error. Please try again.")
+      : cr.disguised
+        ? (cr.disguise_text || "⚠️ ማስተወቂያውን መንካት አለብዎት! ሪዋርድ ለማግኘት ማስተወቂያው ላይ ክሊክ ማድረግ አለብዎት።")
+        : (cr.text || "ማስታወቂያው ሳይዘጋ እስከሚጨርስ ድረስ ይጠብቁ");
+    toast(msg);
+    // This attempt didn't pay and, since it's recorded as 'warning' (not
+    // 'completed'), didn't start or extend any real reward cooldown
+    // either — so there's nothing to display a countdown for. Just hand
+    // the button straight back instead of calling refreshAdsCardSmooth()
+    // (which would resume showing an unrelated ad's cooldown, if one
+    // happened to still be running from earlier today, right under this
+    // reminder — confusing, since the two have nothing to do with each
+    // other).
+    if (btn){ btn.disabled = false; btn.textContent = "▶️ Watch Ad"; }
+    return;
+  }
+
+  // The SDK promise resolving only means the PLAYER finished — it is not
+  // proof AdsGram itself will credit this view (their own criteria, which
+  // may include requiring a click inside the ad, is enforced entirely on
+  // their side). The real confirmation is their server-to-server reward
+  // postback landing on our backend, which shows up here as watched_today
+  // ticking up. AdsGram's own postback timing is out of our control —
+  // sometimes 2s, sometimes 30-60s+ (confirmed from real logs) — so this
+  // waits it out generously (up to ~24s) instead of declaring failure
+  // the instant a short window elapses.
+  const waAttempts = 12; // ~2s apart ≈ 24s ceiling
+  const minConfirmMs = 4000; // always feels the same, even when the backend already confirmed instantly
+  const confirmStarted = performance.now();
+  for (let i = 0; i < waAttempts; i++){
+    if (i === 0) toast("⏳ Confirming your reward…", "loading", { sticky: true });
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const fresh = await api("/api/ads/status", {});
+      ADS = fresh;
+      if ((fresh.watched_today ?? 0) > watchedBefore){
+        confirmed = true;
+        break;
+      }
+    } catch (e) { /* keep polling */ }
+  }
+
+  if (confirmed){
+    const remaining = minConfirmMs - (performance.now() - confirmStarted);
+    if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
+    tg?.HapticFeedback?.notificationOccurred("success");
+    toast(`🎉 +${fmt(ADS.reward_amount)} Birr credited!`);
+  } else {
+    const cr = ADS?.click_reminder;
+    const msg = (!cr || !cr.enabled)
+      ? (cr?.network_text || "⚠️ Network error. Please try again.")
+      : cr.disguised
+        ? (cr.disguise_text || "⚠️ ማስተወቂያውን መንካት አለብዎት! ሪዋርድ ለማግኘት ማስተወቂያው ላይ ክሊክ ማድረግ አለብዎት።")
+        : (cr.text || "ማስታወቂያው ሳይዘጋ እስከሚጨርስ ድረስ ይጠብቁ");
+    toast(msg);
+  }
+  // Update the card's counter/progress/button in place — this is the exact
+  // "return from the ad" moment that used to flicker (full-card rebuild).
+  if (!(await refreshAdsCardSmooth())) await renderHome(document.getElementById("view"));
+}
+
+// LEGACY / UNUSED.
+async function playMonetagAsSecondAd(){
+  for (let s = 3; s >= 1; s--){
+    toast(`➡️ Next ad in ${s}…`, "info");
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  await tryMonetagFallback();
+  if (!(await refreshAdsCardSmooth())) await renderHome(document.getElementById("view"));
+}
+
+// ── Tads (LEGACY / UNUSED as second ad) ────────────────────────────────
+// No longer invoked from watchAd() — Monetag (playMonetagAsSecondAd, above)
+// took over the "un-gated second ad" slot. runTadsGate() itself is left
+// in place, untouched, only in case Tads is ever reintroduced.
+async function playTadsAsSecondAd(){
+  for (let s = 3; s >= 1; s--){
+    toast(`➡️ Next ad in ${s}…`, "info");
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  await runTadsGate();
+  if (!(await refreshAdsCardSmooth())) await renderHome(document.getElementById("view"));
+}
+
+/* ── Direct Link ads (AdsGram Direct Link / Smart Link) ────────────
+   There's no SDK callback for this format — we can't know whether the
+   person actually looked at anything on the other end. So the flow is
+   open link → wait out a short timer → claim, the same trust model
+   already used for "fake" channel-join tasks, not the SDK-confirmed
+   flow rewarded video gets. */
+async function openDirectLinkAd(){
+  const btn = document.getElementById("directLinkBtn");
+  if (btn){ btn.disabled = true; btn.textContent = "Opening…"; }
+
+  let res;
+  try {
+    res = await api("/api/ads/direct-link/open", {});
+  } catch (e) {
+    const msg = e?.message === "daily_limit_reached" ? "❌ Daily limit reached"
+              : e?.message === "cooldown_active"     ? "❌ Please wait a bit before the next one"
+              : e?.message === "direct_link_disabled" ? "❌ Not configured yet"
+              : "❌ Couldn't start — try again";
+    toast(msg);
+    await renderHome(document.getElementById("view"));
+    return;
+  }
+
+  if (tg?.openLink) tg.openLink(res.url);
+  else window.open(res.url, "_blank");
+
+  // We triggered this navigation ourselves, so unlike the AdsGram video
+  // ad (where we're only guessing a tap happened somewhere inside a
+  // creative we don't control), here we know for certain an attempt was
+  // made — arming the same detector just confirms whether it actually
+  // took the user away, using the same signal the video-ad flow relies
+  // on. Feeds the same ad_require_banner_click gate on claim.
+  armBannerClickWatch();
+
+  let left = res.wait_seconds;
+  const label = () => `⏳ Wait ${left}s`;
+  if (btn) btn.textContent = label();
+  clearInterval(window._dlTick);
+  window._dlTick = setInterval(async () => {
+    left -= 1;
+    if (left > 0){
+      if (btn) btn.textContent = label();
+      return;
+    }
+    clearInterval(window._dlTick);
+    disarmBannerClickWatchDelayed(0);
+    if (btn){ btn.disabled = true; btn.textContent = "Claiming…"; }
+    try {
+      const r = await api("/api/ads/direct-link/claim", { event_id: res.event_id });
+      tg?.HapticFeedback?.notificationOccurred("success");
+      toast(`🎉 +${fmt(r.credited)} Birr credited!`);
+    } catch (claimErr) {
+      const msg = claimErr?.message === "no_click_detected"
+        ? "⚠️ Didn't detect that you opened the link — try again"
+        : "⚠️ Couldn't credit the reward — try again";
+      toast(msg);
+    }
+    await renderHome(document.getElementById("view"));
+  }, 1000);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TASKS
+   ══════════════════════════════════════════════════════════════════ */
+let taskTimer = null;
+
+async function renderTasks(view){
+  const [data] = await Promise.all([api("/api/tasks"), loadGateStatus().catch(() => null)]);
+  clearInterval(taskTimer);
+  UTC = data.user_task_config || null; // stash for the create-task form
+
+  const showFakeSection = !ME?.is_admin && GATE.fake_channels?.length && !GATE.fake_seen;
+  const fakeSectionHTML = showFakeSection ? `
+    <h2 class="sect" style="margin-top:0">Recommended Channels</h2>
+    <div class="card" id="fakeChCard" style="display:flex;flex-direction:column;gap:8px;">
+      ${GATE.fake_channels.map(c => `
+        <div class="gate-ch" style="margin-bottom:0">
+          <div class="gc-ic">📢</div>
+          <div class="gc-name">${escapeHtml(c.channel_name)}</div>
+          <a class="btn gold" href="${c.invite_link}" target="_blank" onclick="viewFakeChannel()">View</a>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+
+  const addTaskBtnHTML = (UTC?.enabled)
+    ? `<button class="add-task-btn" onclick="openCreateTaskPage()" title="Create Task">+</button>` : "";
+
+  if (!data.tasks.length){
+    view.innerHTML = fakeSectionHTML
+      + `<div style="display:flex;justify-content:space-between;align-items:center;">
+           <h2 class="sect" style="margin:0">Tasks</h2>${addTaskBtnHTML}
+         </div>
+         <div class="empty">📭 No tasks right now. Check back later!</div>`
+      + myTasksHTML();
+    await renderMyTasks();
+    return;
+  }
+
+  view.innerHTML = fakeSectionHTML
+    + `<div style="display:flex;justify-content:space-between;align-items:center;">
+         <h2 class="sect" style="margin:0">Tasks — Join & Earn</h2>${addTaskBtnHTML}
+       </div>
+       <div id="taskList" class="cascade"></div>`
+    + myTasksHTML();
+  await renderMyTasks();
+  const list = document.getElementById("taskList");
+
+  // Server only tells us "claimable" once the wait timer is done — we then
+  // split that single state into a real two-tap flow: Check (verifies
+  // membership) → Claim (pays the reward). uiStage tracks that locally.
+  function paint(){
+    list.innerHTML = data.tasks.map(t => taskCardHTML(t)).join("");
+  }
+  // Updates a single task's card in place — used everywhere after the
+  // initial paint() so a change to one task never re-renders (and
+  // flickers) every other task card in the list.
+  function paintOne(id){
+    const t = data.tasks.find(x => x.id === id);
+    const el = document.getElementById(`task-${id}`);
+    if (!t || !el) return;
+    // Update content/class on the *same* node (not outerHTML) so this
+    // card doesn't get re-inserted into the DOM every tick — a fresh
+    // node re-triggers the .cascade fade-in animation on every child,
+    // which is what caused the whole list to "pop"/flicker once a
+    // second while a countdown was running.
+    el.className = `task ${t.status === 'completed' ? 'completed' : ''}`;
+    el.innerHTML = taskCardInner(t);
+  }
+  paint();
+
+  taskTimer = setInterval(() => {
+    data.tasks.forEach(t => {
+      if (t.status === "waiting" && t.wait_left > 0){
+        t.wait_left -= 1;
+        if (t.wait_left <= 0){ t.status = "claimable"; t.uiStage = "check"; }
+        paintOne(t.id);
+      }
+    });
+  }, 1000);
+
+  window._taskAction = async (id, action) => {
+    const t = data.tasks.find(x => x.id === id);
+    if (!t) return;
+
+    if (action === "join"){
+      if (t.invite_link) window.open(t.invite_link, "_blank");
+      try {
+        const r = await api("/api/tasks/join", { task_id: id });
+        t.status = "waiting";
+        t.wait_left = r.wait_seconds;
+        paintOne(id);
+      } catch (e){ toast("⚠️ Couldn't start this task."); }
+      return;
+    }
+
+    if (action === "rejoin"){
+      // Falls back to "join" after a failed check — re-opens the invite
+      // link so the user can actually join, then flips the button back
+      // to "Check" so they must verify again. No new /api/tasks/join
+      // call needed here: joined_at is INSERT OR IGNORE'd server-side,
+      // so the original wait-timer state is untouched.
+      if (t.invite_link) window.open(t.invite_link, "_blank");
+      t.uiStage = "check";
+      paintOne(id);
+      return;
+    }
+
+    if (action === "check"){
+      t.uiStage = "checking";
+      paintOne(id);
+      tg?.HapticFeedback?.impactOccurred("light");
+      try {
+        await api("/api/tasks/check", { task_id: id });
+        t.uiStage = "claim";
+        paintOne(id);
+      } catch (e){
+        if (e.message.startsWith("wait:")){
+          t.uiStage = "check";
+          toast(`⏳ Wait ${e.message.split(":")[1]}s more`);
+        } else if (e.message === "not_member"){
+          // Real verification failed — don't just let them mash "Check"
+          // again. Force them back through "Join" so a reward can never
+          // be paid out to someone who hasn't actually joined.
+          t.uiStage = "join";
+          toast("❌ You haven't joined the channel yet — tap Join, then Check again.");
+        } else {
+          t.uiStage = "check";
+          toast("⚠️ Couldn't verify. Try again.");
+        }
+        paintOne(id);
+      }
+      return;
+    }
+
+    if (action === "claim"){
+      t.uiStage = "claiming";
+      paintOne(id);
+      try {
+        const r = await api("/api/tasks/claim", { task_id: id });
+        if (r.status === "completed"){
+          t.status = "completed";
+          toast(`🎉 +${fmt(r.reward)} Birr credited!`);
+          document.getElementById("topBal").textContent = `${fmt(r.balance)} Birr`;
+          celebrateBurst();
+          tg?.HapticFeedback?.notificationOccurred("success");
+        }
+        paintOne(id);
+      } catch (e){
+        if (e.message === "not_checked"){
+          // Shouldn't normally happen through the UI (Check always runs
+          // first), but if it does, send them back through Check rather
+          // than leaving a dead Claim button.
+          t.uiStage = "check";
+          toast("⚠️ Please tap Check again first.");
+        } else {
+          t.uiStage = "claim";
+          toast("⚠️ Something went wrong. Try again.");
+        }
+        paintOne(id);
+      }
+    }
+  };
+}
+
+/* ── User self-serve task creation ("promote your own channel") ────── */
+function myTasksHTML(){
+  return `<h2 class="sect">My Submitted Tasks</h2><div id="myTaskList"><div class="skel skel-card"></div></div>`;
+}
+
+function myTaskStatusLabel(t){
+  if (t.review_status === "pending")  return `<span class="pill-tag fake">Pending Review</span>`;
+  if (t.review_status === "rejected") return `<span class="pill-tag" style="background:#5a2020;color:#ff9d9d">Rejected</span>`;
+  if (t.review_status === "cancelled") return `<span class="pill-tag" style="background:#333">Cancelled</span>`;
+  if (t.budget_slots > 0 && t.slots_used >= t.budget_slots) return `<span class="pill-tag" style="background:#333">Sold Out</span>`;
+  return `<span class="pill-tag force">Live</span>`;
+}
+
+async function renderMyTasks(){
+  const box = document.getElementById("myTaskList");
+  if (!box) return;
+  let mine = [];
+  try {
+    const r = await api("/api/tasks/mine", {});
+    mine = r.tasks || [];
+  } catch (e) {
+    box.innerHTML = `<div class="empty">⚠️ Couldn't load your submitted tasks. <a href="javascript:void(0)" onclick="renderMyTasks()" style="color:#ffb300">Retry</a></div>`;
+    return;
+  }
+  if (!mine.length){ box.innerHTML = `<div class="empty">You haven't created any tasks yet.</div>`; return; }
+  box.innerHTML = mine.map(t => {
+    const canCancel = (t.review_status === "pending" || t.review_status === "approved") && t.slots_used < t.budget_slots;
+    return `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div style="font-weight:700;font-size:.88rem">${escapeHtml(t.title)}</div>
+          ${myTaskStatusLabel(t)}
+        </div>
+        <div class="mini" style="margin-top:4px">
+          ${t.slots_used}/${t.budget_slots} joined · ${fmt(t.reward)} Birr each
+        </div>
+        ${canCancel ? `<button class="task-btn check" style="margin-top:8px" onclick="cancelMyTask(${t.id})">Cancel & Refund Unused</button>` : ""}
+      </div>`;
+  }).join("");
+}
+
+function openCreateTaskPage(){
+  const view = document.getElementById("view");
+  view.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <button class="add-task-btn" style="background:#242424;box-shadow:none;color:#fff;font-size:1.3rem;"
+        onclick="renderTasks(document.getElementById('view'))">‹</button>
+      <h2 class="sect" style="margin:0">Create Task</h2>
+    </div>
+    <div class="card" id="createTaskForm" style="display:flex;flex-direction:column;gap:8px;"></div>
+  `;
+  renderCtStep1();
+}
+
+// Carried from step 1 into step 2/submit. Empty channel = unverified/"fake".
+let _ctVerifiedChannel = "";
+let _ctInviteLink = "";
+let _ctTitle = "";
+
+// Accepts @username, a bare username, or a https://t.me/... link and
+// figures out the public username (if any) plus a clean invite link.
+// Private invite-only links (t.me/+xxx, t.me/joinchat/xxx) have no
+// derivable username, so they can't be auto-verified.
+function parseChannelInput(raw){
+  raw = (raw || "").trim();
+  if (!raw) return null;
+  if (/t\.me\/(\+|joinchat\/)/i.test(raw)){
+    const link = raw.startsWith("http") ? raw : `https://${raw.replace(/^@/, "")}`;
+    return { username: null, chatId: null, inviteLink: link, isPrivate: true };
+  }
+  let username = null;
+  const linkMatch = raw.match(/t\.me\/@?([A-Za-z0-9_]{4,32})/i);
+  if (linkMatch) username = linkMatch[1];
+  else if (raw.startsWith("@")) username = raw.slice(1);
+  else if (/^[A-Za-z0-9_]{4,32}$/.test(raw)) username = raw;
+  if (!username) return { username: null, chatId: null, inviteLink: raw, isPrivate: false };
+  return { username, chatId: `@${username}`, inviteLink: `https://t.me/${username}`, isPrivate: false };
+}
+
+// If the real channel name is too long to sit nicely in a task-card
+// label, fall back to a short generic caption instead of overflowing it.
+function ctDisplayTitle(title){
+  if (!title) return "Join Channel";
+  return title.length > 28 ? "Join Channel" : title;
+}
+
+function renderCtStep1(){
+  const wrap = document.getElementById("createTaskForm");
+  const botTag = UTC.bot_username ? `@${escapeHtml(UTC.bot_username)}` : "the bot";
+  wrap.innerHTML = `
+    <div class="mini">
+      To let us verify people actually joined, add ${botTag} as an <b>Admin</b>
+      in your channel. Then enter your channel's username or link below —
+      just like joining it yourself, no ID needed. We'll pick up the
+      channel name automatically.
+    </div>
+    <label class="f">Channel Username or Link</label>
+    <input id="ctChannel" placeholder="@yourchannel or https://t.me/yourchannel">
+    <button class="btn gold" id="ctCheckBtn" onclick="checkCtAdmin()">🔄 I've Added the Bot — Check</button>
+    <button class="btn ghost" id="ctSkipBtn" onclick="skipCtVerify()">Skip verification (unverified task)</button>
+  `;
+}
+
+async function checkCtAdmin(){
+  const raw = document.getElementById("ctChannel").value.trim();
+  const parsed = parseChannelInput(raw);
+  if (!parsed) return toast("❌ Enter your channel username or link first");
+  if (parsed.isPrivate || !parsed.chatId){
+    return toast("⚠️ Can't auto-verify a private invite link — use 'Skip verification' below");
+  }
+  const btn = document.getElementById("ctCheckBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin-ico"></span> Checking…`;
+  try {
+    const r = await api("/api/tasks/verify_admin", { channel_id: parsed.chatId });
+    if (r.is_admin){
+      tg?.HapticFeedback?.notificationOccurred("success");
+      _ctVerifiedChannel = parsed.chatId;
+      _ctInviteLink = parsed.inviteLink;
+      _ctTitle = (r.title || parsed.username || "").trim();
+      renderCtStep2(true);
+    } else {
+      toast("❌ Bot isn't an admin there yet — add it, then tap Check again");
+      btn.disabled = false;
+      btn.innerHTML = "🔄 I've Added the Bot — Check";
+    }
+  } catch (e){
+    toast("⚠️ Couldn't verify — try again");
+    btn.disabled = false;
+    btn.innerHTML = "🔄 I've Added the Bot — Check";
+  }
+}
+
+async function skipCtVerify(){
+  const raw = document.getElementById("ctChannel").value.trim();
+  const parsed = parseChannelInput(raw);
+  if (!parsed || !parsed.inviteLink) return toast("❌ Enter your channel username or link first");
+  const btn = document.getElementById("ctSkipBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin-ico"></span> Loading…`;
+  _ctVerifiedChannel = "";
+  _ctInviteLink = parsed.inviteLink;
+  _ctTitle = parsed.username || "";
+  // Best-effort name lookup even when skipping verification — public
+  // channels can still be looked up without the bot being an admin.
+  if (parsed.chatId){
+    try {
+      const r = await api("/api/tasks/verify_admin", { channel_id: parsed.chatId });
+      if (r.title) _ctTitle = r.title.trim();
+    } catch (e) { /* ignore — we'll just use the username as the title */ }
+  }
+  renderCtStep2(false);
+}
+
+function renderCtStep2(verified){
+  const wrap = document.getElementById("createTaskForm");
+  const shownTitle = ctDisplayTitle(_ctTitle);
+  wrap.innerHTML = `
+    <div class="mini">
+      ${verified ? "✅ Verified" : "⚠️ Unverified"}
+    </div>
+    <div class="mini" style="font-weight:700;color:#e8e8e8">📢 ${escapeHtml(shownTitle)}</div>
+    <label class="f">Reward per Person (Birr, ${UTC.min_reward}–${UTC.max_reward})</label>
+    <input id="ctReward" type="number" step="0.1" min="${UTC.min_reward}" max="${UTC.max_reward}" oninput="updateCtCost()">
+    <label class="f">Number of People (${UTC.min_slots}–${UTC.max_slots})</label>
+    <input id="ctSlots" type="number" min="${UTC.min_slots}" max="${UTC.max_slots}" oninput="updateCtCost()">
+    <div class="mini" id="ctCost">Total cost: 0.00 Birr</div>
+    <div class="mini" id="ctLowBalanceHint" style="display:none;color:#ff9d5c">
+      Not enough balance for this? ${ME?.support_username
+        ? `<a href="javascript:void(0)" onclick="openSupport()" style="color:#ffb300">Contact admin to top up your funds</a>`
+        : "Contact the admin to top up your funds."}
+    </div>
+    <button class="btn gold" id="ctSubmitBtn" onclick="submitCreateTask()">Submit for Review</button>
+  `;
+}
+
+function updateCtCost(){
+  const r = parseFloat(document.getElementById("ctReward")?.value) || 0;
+  const s = parseInt(document.getElementById("ctSlots")?.value, 10) || 0;
+  const total = r * s;
+  const el = document.getElementById("ctCost");
+  if (el) el.textContent = `Total cost: ${fmt(total)} Birr (deducted from your balance now)`;
+  const hint = document.getElementById("ctLowBalanceHint");
+  if (hint) hint.style.display = (total > 0 && total > (ME?.balance || 0)) ? "block" : "none";
+}
+
+async function submitCreateTask(){
+  const reward = parseFloat(document.getElementById("ctReward").value);
+  const budget_slots = parseInt(document.getElementById("ctSlots").value, 10);
+  if (!_ctTitle || !_ctInviteLink || !reward || !budget_slots){
+    return toast("❌ Please fill in every field");
+  }
+  const btn = document.getElementById("ctSubmitBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin-ico"></span> Submitting…`;
+  try {
+    await api("/api/tasks/create", {
+      title: _ctTitle, invite_link: _ctInviteLink, reward, budget_slots, channel_id: _ctVerifiedChannel,
+    });
+    tg?.HapticFeedback?.notificationOccurred("success");
+    toast("✅ Submitted — waiting for admin approval");
+    await renderTasks(document.getElementById("view"));
+  } catch (e){
+    const msg = e.message === "insufficient_balance" ? "❌ Not enough balance"
+              : e.message === "reward_out_of_range" ? `❌ Reward must be ${UTC.min_reward}-${UTC.max_reward} Birr`
+              : e.message === "slots_out_of_range"  ? `❌ Number of people must be ${UTC.min_slots}-${UTC.max_slots}`
+              : e.message === "invalid_link"        ? "❌ Please use a valid t.me channel"
+              : "❌ Couldn't submit — try again";
+    toast(msg);
+    if (e.message === "insufficient_balance"){
+      const hint = document.getElementById("ctLowBalanceHint");
+      if (hint) hint.style.display = "block";
+    }
+    btn.disabled = false;
+    btn.innerHTML = "Submit for Review";
+  }
+}
+
+async function cancelMyTask(id){
+  try {
+    const r = await api("/api/tasks/cancel", { task_id: id });
+    toast(`✅ Cancelled — ${fmt(r.refunded)} Birr refunded`);
+    await renderTasks(document.getElementById("view"));
+  } catch (e){
+    toast("❌ Couldn't cancel — try again");
+  }
+}
+
+function taskCardInner(t){
+  // No visible tag distinguishing "fake" (no real check) from "force"
+  // (real check) tasks in the user-facing list — they must look
+  // identical so users can't tell which ones are unverified.
+  const typeTag = "";
+  let btn;
+  if (t.task_type === "manual"){
+    // Manual/screenshot-proof tasks skip the join→check→claim wait-timer
+    // flow entirely — it's upload → wait for the admin's own decision.
+    // Expects the backend to report t.status as one of:
+    // "completed" (approved & paid), "review" (submitted, awaiting admin),
+    // "rejected" (admin declined — user may resubmit), or anything else
+    // meaning "not submitted yet".
+    if (t.status === "completed"){
+      btn = `<button class="task-btn done" disabled>✓ Done</button>`;
+    } else if (t.status === "review"){
+      btn = `<button class="task-btn wait" disabled>⏳ Pending Review</button>`;
+    } else if (t.status === "rejected"){
+      // One attempt per person per task — a rejection is final, not a
+      // "try again". Backend blocks a second /manual/submit for this
+      // task regardless, so don't offer a button that would just fail.
+      btn = `<button class="task-btn" style="background:#3a2323;color:#f87171" disabled>❌ Rejected</button>`;
+    } else {
+      btn = `<button class="task-btn join" onclick="openManualSubmit(${t.id})">📥 Download</button>`;
+    }
+  } else if (t.status === "completed"){
+    btn = `<button class="task-btn done" disabled>✓ Done</button>`;
+  } else if (t.status === "waiting"){
+    btn = `<button class="task-btn wait" disabled>⏳ ${t.wait_left}s</button>`;
+  } else if (t.status === "claimable"){
+    const stage = t.uiStage || "check";
+    if (stage === "checking"){
+      btn = `<button class="task-btn check busy" disabled><span class="spin-ico"></span> Checking</button>`;
+    } else if (stage === "claim"){
+      btn = `<button class="task-btn claim" onclick="_taskAction(${t.id},'claim')">Claim</button>`;
+    } else if (stage === "claiming"){
+      btn = `<button class="task-btn claim dark-spin busy" disabled><span class="spin-ico"></span> Claiming</button>`;
+    } else if (stage === "join"){
+      // Check failed (not actually a member) — send them back to Join
+      // instead of leaving "Check" tappable forever.
+      btn = `<button class="task-btn join" onclick="_taskAction(${t.id},'rejoin')">Join</button>`;
+    } else {
+      btn = `<button class="task-btn check" onclick="_taskAction(${t.id},'check')">Check</button>`;
+    }
+  } else {
+    btn = `<button class="task-btn join" onclick="_taskAction(${t.id},'join')">Join</button>`;
+  }
+  return `
+    <div class="task-ic">📢</div>
+    <div class="task-body">
+      <div class="task-title">${escapeHtml(t.title)} ${typeTag}</div>
+      <div class="task-reward">+${fmt(t.reward)} Birr</div>
+    </div>
+    ${btn}
+  `;
+}
+
+function taskCardHTML(t){
+  return `
+    <div class="task ${t.status === 'completed' ? 'completed' : ''}" id="task-${t.id}">
+      ${taskCardInner(t)}
+    </div>
+  `;
+}
+
+function escapeHtml(s){
+  return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// Telegram's own in-app browser (opened by a plain <a target="_blank">)
+// is a restricted WebView that some external sites don't load correctly
+// in — playbb.fun's invite-link check was one such case, but it worked
+// fine in Chrome. tg.openLink() hands the URL to the system browser
+// instead, same as the existing AdsGram/direct-link flow already does.
+function openExternal(url){
+  if (!url) return;
+  if (tg?.openLink) tg.openLink(url);
+  else window.open(url, "_blank");
+}
+
+/* ── Manual/screenshot-proof task submission ─────────────────────────
+   Backend contract (not in this file — implement server-side):
+   POST /api/tasks/manual/submit  { task_id, screenshots: [dataURL, ...] }
+     -> { status: "review" }
+   Images are sent as data: URLs (base64) in the JSON body, same as
+   every other call through api(). For 1-2 phone-camera screenshots
+   this is fine; if photos come out large, consider downscaling them
+   client-side before this ships (canvas resize) to keep payloads small
+   on slow connections. */
+
+/* Admins still type instructions as ONE plain-text field, e.g.
+   "📦 መመሪያ 1️⃣ ... 2️⃣ ... ⚠️ ማስታወሻ፦ ..." — no admin UI change needed.
+   This just splits that string into { steps:[{num,text}], warning }
+   so the user sees numbered step cards + a separate warning banner
+   instead of one dense paragraph. */
+function parseInstructions(raw){
+  if (!raw) return { header: "", steps: [], warning: "" };
+  let text = raw.trim();
+
+  // 1) Pull out the warning: everything from the first ⚠️ to the end.
+  let warning = "";
+  const warnIdx = text.indexOf("⚠️");
+  if (warnIdx !== -1){
+    warning = text.slice(warnIdx + 2).trim();
+    text = text.slice(0, warnIdx).trim();
+  }
+
+  // 2) Pull out any leading text before the first step marker (keycap
+  // emoji like 1️⃣, or plain "1." / "1)" numbering) as a header line —
+  // e.g. "📥 መመሪያ" typed before the numbered steps. Previously this was
+  // silently dropped; now it's kept and shown above the steps.
+  let header = "";
+  const keycapAt = /([0-9]\uFE0F?\u20E3|\uD83D\uDD1F)/;
+  const dotAt = /(?:^|\s)([0-9]{1,2})[.)]\s+/;
+  const keycapMatch = keycapAt.exec(text);
+  const dotMatch = dotAt.exec(text);
+  let markerIdx = -1;
+  if (keycapMatch && dotMatch) markerIdx = Math.min(keycapMatch.index, dotMatch.index);
+  else if (keycapMatch) markerIdx = keycapMatch.index;
+  else if (dotMatch) markerIdx = dotMatch.index;
+  if (markerIdx > 0){
+    header = text.slice(0, markerIdx).trim();
+    text = text.slice(markerIdx).trim();
+  }
+
+  // 3) Split remaining text on keycap-number emoji (1️⃣ 2️⃣ … 9️⃣, 🔟).
+  const keycap = /([0-9]\uFE0F?\u20E3|\uD83D\uDD1F)/g;
+  const parts = text.split(keycap).filter(p => p && p.trim());
+  let steps = [];
+  for (let i = 0; i < parts.length; i++){
+    if (/^([0-9]\uFE0F?\u20E3|\uD83D\uDD1F)$/.test(parts[i])){
+      const num = parts[i] === "\uD83D\uDD1F" ? "10" : parts[i][0];
+      const content = (parts[i + 1] || "").trim();
+      if (content) steps.push({ num, text: content });
+      i++;
+    }
+  }
+
+  // 4) Fallback: plain "1. " / "1) " style numbering if no keycaps found.
+  if (steps.length === 0){
+    const dotSplit = text.split(/(?:^|\s)([0-9]{1,2})[.)]\s+/).filter(p => p && p.trim());
+    for (let i = 0; i < dotSplit.length; i++){
+      if (/^[0-9]{1,2}$/.test(dotSplit[i])){
+        const content = (dotSplit[i + 1] || "").trim();
+        if (content) steps.push({ num: dotSplit[i], text: content });
+        i++;
+      }
+    }
+  }
+
+  // 5) Last resort: no markers at all — show as a single unnumbered step.
+  if (steps.length === 0 && text) steps.push({ num: "", text });
+
+  return { header, steps, warning };
+}
+
+async function openManualSubmit(id){
+  const view = document.getElementById("view");
+  view.innerHTML = `<div class="skel skel-card"></div>`;
+  let t;
+  try {
+    const { tasks } = await api("/api/tasks");
+    t = tasks.find(x => x.id === id);
+  } catch (e) { /* fall through to the !t check below */ }
+  if (!t) { toast("⚠️ Couldn't load task."); return renderTasks(view); }
+
+  const count = t.screenshot_count || 1;
+  const { header, steps, warning } = parseInstructions(t.instructions);
+  const headerHTML = header ? `<div class="ms-heading">${escapeHtml(header)}</div>` : "";
+  const stepsHTML = steps.length ? `
+    <div class="ms-steps">
+      ${steps.map((s, i) => `
+        <div class="ms-step">
+          <div class="ms-num">${escapeHtml(s.num || String(i + 1))}</div>
+          <p>${escapeHtml(s.text)}</p>
+        </div>`).join("")}
+    </div>` : "";
+  const warnHTML = warning ? `<div class="ms-warn">⚠️ <span>${escapeHtml(warning)}</span></div>` : "";
+
+  view.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <button class="add-task-btn" style="background:#242424;box-shadow:none;color:#fff;font-size:1.3rem;"
+        onclick="renderTasks(document.getElementById('view'))">‹</button>
+      <h2 class="sect" style="margin:0">${escapeHtml(t.title)}</h2>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px;">
+      ${headerHTML}
+      ${stepsHTML}
+      ${warnHTML}
+      ${t.invite_link ? `<button class="btn gold" onclick="openExternal(${escapeHtml(JSON.stringify(t.invite_link))})">📥 Download</button>` : ""}
+      <div style="text-align:center;font-size:.78rem;color:var(--ink-dim);">Screenshot</div>
+      <div id="msSlots" style="display:flex;flex-direction:column;gap:12px;"></div>
+      <button class="btn gold" id="msSubmitBtn" disabled onclick="submitManualProof(${id})">Submit for Review</button>
+    </div>
+  `;
+  window._msFiles = new Array(count).fill(null);
+  const slots = document.getElementById("msSlots");
+  slots.innerHTML = Array.from({ length: count }).map((_, i) => `
+    <div class="ms-slot">
+      ${count > 1 ? `<label class="f">Screenshot ${i + 1}</label>` : ""}
+      <label class="ms-drop" for="msFile${i}" id="msDropLabel${i}">
+        <div class="ms-drop-ic">Upload</div>
+        <div class="ms-drop-t1">Choose screenshot</div>
+        <div class="ms-drop-t2">tap to select from gallery</div>
+      </label>
+      <input class="ms-input" type="file" accept="image/*" id="msFile${i}" onchange="previewManualFile(${i})">
+      <img id="msPreview${i}" class="ms-preview">
+    </div>
+  `).join("");
+}
+
+function previewManualFile(i){
+  const file = document.getElementById(`msFile${i}`).files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    window._msFiles[i] = reader.result; // data:image/...;base64,...
+    const img = document.getElementById(`msPreview${i}`);
+    img.src = reader.result;
+    img.style.display = "block";
+    const label = document.getElementById(`msDropLabel${i}`);
+    if (label){
+      label.classList.add("filled");
+      label.innerHTML = `
+        <div class="ms-drop-ic">✅</div>
+        <div class="ms-drop-t1">${escapeHtml(file.name)}</div>
+        <div class="ms-drop-t2">tap to change</div>`;
+    }
+    const btn = document.getElementById("msSubmitBtn");
+    if (btn) btn.disabled = !window._msFiles.every(Boolean);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitManualProof(id){
+  const btn = document.getElementById("msSubmitBtn");
+  btn.disabled = true;
+  btn.textContent = "Submitting…";
+  try {
+    await api("/api/tasks/manual/submit", { task_id: id, screenshots: window._msFiles });
+    toast("✅ Submitted — waiting for admin review");
+    await renderTasks(document.getElementById("view"));
+  } catch (e){
+    toast("⚠️ Couldn't submit. Try again.");
+    btn.disabled = false;
+    btn.textContent = "Submit for Review";
+  }
+}
+
+async function viewFakeChannel(){
+  GATE.fake_seen = true;
+  const card = document.getElementById("fakeChCard");
+  if (card) card.style.display = "none";
+  try { await api("/api/gate/fake_seen"); } catch (e) {}
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INVITE
+   ══════════════════════════════════════════════════════════════════ */
+async function renderInvite(view){
+  await refreshMe();
+  view.innerHTML = `
+    <h2 class="sect">Your Invite Link</h2>
+    <div class="card">
+      <div class="copybox">
+        <input readonly id="refLink" value="${ME.referral_link}">
+        <button class="btn sm" style="width:auto;padding:11px 16px;" onclick="copyLink()">Copy</button>
+      </div>
+      <button class="btn gold" id="shareLinkBtn" style="margin-top:10px" onclick="shareLink()">📤 Share with Friends</button>
+      <div class="mini" style="margin-top:10px">
+        💰 You earn <b>${fmt(ME.reward_per_referral)} Birr</b> per invite — credited after your friend completes verification.
+      </div>
+    </div>
+    <h2 class="sect">Network</h2>
+    <div class="card stat-row" style="margin-bottom:0">
+      <div class="stat-box"><div class="n">${ME.referrals}</div><div class="l">Direct</div></div>
+      <div class="stat-box"><div class="n">${ME.tier2_referrals}</div><div class="l">Tier-2</div></div>
+      <div class="stat-box"><div class="n">${fmt(ME.total_earned_refs)}</div><div class="l">Earned</div></div>
+    </div>
+  `;
+}
+function copyLink(){
+  const el = document.getElementById("refLink");
+  el.select(); document.execCommand("copy");
+  navigator.clipboard?.writeText(el.value).catch(()=>{});
+  toast("🔗 Link copied!");
+}
+function shareLink(){
+  // Plain text share via Telegram's native "send to" picker — no inline
+  // keyboard, no dependency on inline mode being enabled in BotFather.
+  // The link is embedded directly in the text (not passed as a separate
+  // `url` param) — otherwise Telegram prepends the link before the text
+  // instead of after it.
+  const text = "🎉 I'm earning real money with this bot — and you can too!\n\n"
+             + "✅ Complete simple tasks\n"
+             + "✅ Watch short ads\n"
+             + "✅ Invite friends for bonus rewards\n"
+             + "✅ Withdraw straight to Telebirr\n\n"
+             + "Join now 👇\n"
+             + ME.referral_link;
+  const shareUrl = `https://t.me/share/url?url=&text=${encodeURIComponent(text)}`;
+  tg?.openTelegramLink ? tg.openTelegramLink(shareUrl) : window.open(shareUrl, "_blank");
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WITHDRAW
+   ══════════════════════════════════════════════════════════════════ */
+let wMethod = "telebirr"; // "telebirr" | "binance" — selected payout method on the Withdraw tab
+async function renderWithdraw(view){
+  await refreshMe();
+  const hist = await api("/api/withdraw/history");
+  view.innerHTML = `
+    <div class="cascade">
+    <h2 class="sect" style="margin-top:0">Request Withdrawal</h2>
+    <div class="card">
+      <label class="f">Payout Method</label>
+      <div class="seg" id="wMethodSeg" style="display:flex;gap:8px;margin-bottom:10px">
+        <button type="button" class="btn sm ${wMethod==='telebirr'?'gold':'ghost'}" style="width:auto;flex:1" onclick="setWithdrawMethod('telebirr')">📲 Telebirr</button>
+        <button type="button" class="btn sm ${wMethod==='binance'?'gold':'ghost'}" style="width:auto;flex:1;display:flex;align-items:center;justify-content:center;gap:6px" onclick="setWithdrawMethod('binance')">${BINANCE_ICON_SVG} Binance Pay</button>
+      </div>
+      <label class="f">Amount (Birr) — min ${fmt(ME.min_withdrawal)}</label>
+      <input type="number" id="wAmount" placeholder="e.g. ${fmt(ME.min_withdrawal)}" oninput="updateWithdrawConversion()">
+      <div id="wConversionWrap"></div>
+      <div id="wMethodFields"></div>
+      <button class="btn glass-gold" id="wSubmitBtn" onclick="submitWithdraw()">💸 Submit Request</button>
+    </div>
+    <h2 class="sect">History</h2>
+    <div class="card" id="wHistory">
+      ${hist.withdrawals.length ? hist.withdrawals.map(w => `
+        <div class="list-item">
+          <div>
+            <div style="font-weight:700;font-size:.82rem">${fmt(w.amount)} Birr</div>
+            <div class="mini">${w.created_at}${w.method === 'binance' ? ' · Binance Pay' : ''}</div>
+          </div>
+          <span class="pill-tag ${w.status === 'approved' ? 'fake' : w.status === 'rejected' ? 'force' : ''}"
+                style="background:${w.status==='pending'?'rgba(58,123,213,.15)':''};color:${w.status==='pending'?'#7fa8ff':''}">
+            ${w.status.toUpperCase()}
+          </span>
+        </div>
+      `).join("") : `<div class="empty">No withdrawals yet.</div>`}
+    </div>
+    </div>
+  `;
+  renderWithdrawMethodFields();
+  updateWithdrawConversion();
+}
+function setWithdrawMethod(method){
+  wMethod = method;
+  const view = document.getElementById("view");
+  const seg = document.getElementById("wMethodSeg");
+  if (seg) seg.querySelectorAll("button").forEach((b,i) => {
+    const isActive = (i === 0 && method === "telebirr") || (i === 1 && method === "binance");
+    b.className = `btn sm ${isActive ? "gold" : "ghost"}`;
+    b.style.width = "auto"; b.style.flex = "1";
+  });
+  renderWithdrawMethodFields();
+  updateWithdrawConversion(true);
+}
+function renderWithdrawMethodFields(){
+  const wrap = document.getElementById("wMethodFields");
+  if (!wrap) return;
+  const inner = wMethod === "binance" ? `
+    <label class="f">Binance UID</label>
+    <input type="text" id="wBinanceUid" placeholder="e.g. 123456789" inputmode="numeric">
+  ` : `
+    <label class="f">Telebirr Phone Number</label>
+    <input type="text" id="wPhone" placeholder="09xxxxxxxx">
+    <label class="f">Full Name</label>
+    <input type="text" id="wName" placeholder="Account holder name">
+  `;
+  wrap.innerHTML = `<div class="field-fade">${inner}</div>`;
+}
+let wUsdtAnimFrame = null;
+let wUsdtDisplayed = 0;
+function animateUsdtValue(target){
+  const el = document.getElementById("wUsdtValue");
+  if (!el) return;
+  const start = wUsdtDisplayed;
+  const startTime = performance.now();
+  const duration = 220;
+  if (wUsdtAnimFrame) cancelAnimationFrame(wUsdtAnimFrame);
+  function step(now){
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic — feels like a live ticking counter
+    const val = start + (target - start) * eased;
+    el.textContent = val.toFixed(2);
+    // Track the true value on-screen every frame (not just at completion) so
+    // that if a new keystroke interrupts this animation, the next one starts
+    // from what's actually visible instead of jumping from a stale number.
+    wUsdtDisplayed = val;
+    if (t < 1){
+      wUsdtAnimFrame = requestAnimationFrame(step);
+    } else {
+      wUsdtDisplayed = target;
+      el.textContent = target.toFixed(2);
+    }
+  }
+  wUsdtAnimFrame = requestAnimationFrame(step);
+}
+function updateWithdrawConversion(animate = false){
+  const wrap = document.getElementById("wConversionWrap");
+  if (!wrap) return;
+  if (wMethod !== "binance"){ wrap.innerHTML = ""; wUsdtDisplayed = 0; return; }
+  const amount = parseFloat(document.getElementById("wAmount")?.value) || 0;
+  const rate = ME?.usdt_rate || 155;
+  const usdt = amount > 0 ? (amount / rate) : 0;
+  const hasAmount = amount > 0;
+
+  const rateElAlready = document.getElementById("wRateValue");
+  const usdtElAlready = document.getElementById("wUsdtValue");
+
+  if (usdtElAlready && !animate && hasAmount){
+    // "You'll receive" is already on screen and the person is still typing —
+    // just tick the number live instead of re-rendering the whole block.
+    const rateEl = document.getElementById("wRateValue");
+    if (rateEl) rateEl.textContent = fmt(rate);
+    animateUsdtValue(usdt);
+    return;
+  }
+
+  // First time this block appears, or the amount was just cleared/method
+  // just switched — (re)build it. Fade it in only when it's newly appearing.
+  const isFreshAppearance = animate || !rateElAlready || (hasAmount && !usdtElAlready);
+  wrap.innerHTML = `
+    <div class="mini${isFreshAppearance ? ' field-fade' : ''}" style="margin:-4px 0 10px;color:var(--lime,#c8f24d)">
+      Rate: 1 USDT ≈ <span id="wRateValue">${fmt(rate)}</span> Birr${hasAmount
+        ? ` — you'll receive ≈ <b><span id="wUsdtValue">0.00</span> USDT</b>`
+        : ``}
+    </div>`;
+  if (hasAmount){ wUsdtDisplayed = 0; animateUsdtValue(usdt); }
+}
+async function submitWithdraw(){
+  const amount = parseFloat(document.getElementById("wAmount").value);
+  if (!amount || amount < ME.min_withdrawal) return toast(`❌ Min ${fmt(ME.min_withdrawal)} Birr`);
+  if (amount > ME.balance) return toast(`❌ Insufficient balance. Your balance is ${fmt(ME.balance)} Birr.`);
+
+  let payload;
+  if (wMethod === "binance"){
+    const binance_uid = document.getElementById("wBinanceUid").value.trim();
+    if (binance_uid.length < 5) return toast("❌ Enter a valid Binance UID");
+    payload = { amount, method: "binance", binance_uid };
+  } else {
+    const phone = document.getElementById("wPhone").value.trim();
+    const name  = document.getElementById("wName").value.trim();
+    if (phone.length < 9) return toast("❌ Enter a valid phone number");
+    if (name.length < 3) return toast("❌ Enter your full name");
+    payload = { amount, method: "telebirr", phone, full_name: name };
+  }
+
+  const btn = document.getElementById("wSubmitBtn");
+  const card = btn.closest(".card");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin-ico"></span> Submitting…`;
+  card.querySelectorAll("input, button").forEach(i => i.disabled = true);
+
+  try {
+    await api("/api/withdraw", payload);
+    tg?.HapticFeedback?.notificationOccurred("success");
+    card.innerHTML = `
+      <div style="text-align:center;padding:6px 0 4px;animation:fadeSlideUp .35s ease">
+        <div class="check-burst">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6" stroke="#c8f24d" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div style="font-weight:700;font-family:'Unbounded',sans-serif;margin-bottom:4px;font-size:.9rem">Request Submitted</div>
+        <div class="mini">We'll process it within 24–48 hours.</div>
+      </div>`;
+    setTimeout(() => renderWithdraw(document.getElementById("view")), 1500);
+  } catch (e){
+    let msg = e.message || "Failed";
+    if (msg === "insufficient_funds") msg = "Insufficient balance.";
+    else if (msg.startsWith("min_withdrawal_is_")) msg = `Min ${fmt(msg.split("_").pop())} Birr`;
+    toast("❌ " + msg);
+    btn.disabled = false;
+    btn.innerHTML = "💸 Submit Request";
+    card.querySelectorAll("input, button").forEach(i => i.disabled = false);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ADMIN
+   ══════════════════════════════════════════════════════════════════ */
+let adminSubTab = "tasks";
+
+async function renderAdmin(view){
+  view.innerHTML = `
+    <h2 class="sect" style="margin-top:0">Admin Control Center</h2>
+    <div class="card stat-row" id="adminStatRow" style="margin-bottom:14px">
+      <div class="stat-box"><div class="n" id="statTotal">—</div><div class="l">Total Users</div></div>
+      <div class="stat-box"><div class="n" id="statOnline">—</div><div class="l">Online Now</div></div>
+    </div>
+    <div class="admin-nav" id="adminNav">
+      <button data-t="tasks" class="active">Tasks</button>
+      <button data-t="channels">Gate Channels</button>
+      <button data-t="withdrawals">Withdrawals</button>
+      <button data-t="users">Users</button>
+      <button data-t="ads">Ads</button>
+      <button data-t="settings">Settings</button>
+      <button data-t="broadcast">Broadcast</button>
+    </div>
+    <div id="adminBody"></div>
+  `;
+  document.getElementById("adminNav").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    document.querySelectorAll("#adminNav button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    adminSubTab = b.dataset.t;
+    paintAdminBody();
+  });
+  loadAdminOverview();
+  await paintAdminBody();
+}
+
+async function loadAdminOverview(){
+  try {
+    const s = await api("/api/admin/stats/overview");
+    const elT = document.getElementById("statTotal");
+    const elO = document.getElementById("statOnline");
+    if (elT) elT.textContent = s.total_users;
+    if (elO) elO.textContent = s.online_users;
+  } catch (e) { /* non-fatal — stats are a nice-to-have */ }
+}
+
+async function paintAdminBody(){
+  const body = document.getElementById("adminBody");
+  body.innerHTML = `<div class="skel skel-card"></div><div class="skel skel-card"></div>`;
+  if (adminSubTab === "tasks")       return adminTasks(body);
+  if (adminSubTab === "channels")    return adminChannels(body);
+  if (adminSubTab === "withdrawals") return adminWithdrawals(body);
+  if (adminSubTab === "users")       return adminUsers(body);
+  if (adminSubTab === "ads")         return adminAds(body);
+  if (adminSubTab === "settings")    return adminSettings(body);
+  if (adminSubTab === "broadcast")   return adminBroadcast(body);
+}
+
+/* ── Admin: Tasks ─────────────────────────────────────────────── */
+async function adminTasks(body){
+  window._editingTaskId = null; // fresh paint always starts in "add" mode
+  const [{ tasks }, { tasks: pending }, { submissions: manualPending }] = await Promise.all([
+    api("/api/admin/tasks/list"),
+    api("/api/admin/tasks/pending").catch(() => ({ tasks: [] })),
+    api("/api/admin/tasks/manual_submissions").catch(() => ({ submissions: [] })),
+  ]);
+  const pendingHTML = pending.length ? `
+    <h2 class="sect" style="margin-top:0">User-Submitted Tasks Awaiting Review (${pending.length})</h2>
+    <div class="card" id="pendingTaskList" style="display:flex;flex-direction:column;gap:10px;">
+      ${pending.map(t => `
+        <div class="card" style="margin:0;">
+          <div style="font-weight:700;font-size:.88rem">${escapeHtml(t.title)}</div>
+          <div class="mini" style="margin:4px 0">
+            By user ${t.created_by} · ${t.budget_slots} people × ${fmt(t.reward)} Birr = ${fmt(t.budget_slots * t.reward)} Birr escrowed
+          </div>
+          <div class="mini">${escapeHtml(t.invite_link)}</div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="btn gold" style="flex:1" onclick="reviewUserTask(${t.id}, true)">✅ Approve</button>
+            <button class="btn ghost" style="flex:1" onclick="reviewUserTask(${t.id}, false)">❌ Reject & Refund</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+  // Screenshots are no longer stored/served by our backend — the photos
+  // went straight to every admin's Telegram DM at submission time (with
+  // their own Approve/Reject buttons there). `screenshots` here is just
+  // Telegram file_ids for the record, not viewable URLs, so this queue
+  // is a text-only fallback: use it if you didn't act on the Telegram
+  // message, not to see the image.
+  const manualPendingHTML = manualPending.length ? `
+    <h2 class="sect" style="margin-top:0">Screenshot Proofs Awaiting Review (${manualPending.length})</h2>
+    <div class="card" id="manualSubList" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="mini">📸 Photos were sent to your Telegram DM with their own Approve/Reject buttons. Use those — this list is a fallback in case you missed one.</div>
+      ${manualPending.map(s => `
+        <div class="card" style="margin:0;">
+          <div style="font-weight:700;font-size:.88rem">${escapeHtml(s.task_title)}</div>
+          <div class="mini" style="margin:4px 0">User ${s.user_id}${s.username ? " · @" + escapeHtml(s.username) : ""}</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn gold" style="flex:1" onclick="reviewManualSubmission(${s.id}, true)">✅ Approve & Pay</button>
+            <button class="btn ghost" style="flex:1" onclick="reviewManualSubmission(${s.id}, false)">❌ Reject</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+  body.innerHTML = pendingHTML + manualPendingHTML + `
+    <div class="card" id="atFormCard">
+      <h2 class="sect" id="atFormHeading" style="margin-top:0">Add New Task</h2>
+      <label class="f">Task Title</label>
+      <input id="atTitle" placeholder="e.g. Join our News Channel">
+      <label class="f">Type</label>
+      <select id="atType" onchange="toggleManualFields()">
+        <option value="fake">🟡 Fake Join — no real check, wait-timer only</option>
+        <option value="force">🔴 Force Join — bot must be admin, real check</option>
+        <option value="manual">📸 Manual Review — user submits screenshot(s)</option>
+      </select>
+      <label class="f">Channel ID (only needed for Force Join, e.g. -1001234567890)</label>
+      <input id="atChannelId" placeholder="-1001234567890">
+      <label class="f">Invite Link / Download Link</label>
+      <input id="atLink" placeholder="https://t.me/yourchannel">
+      <div id="atManualFields" style="display:none;flex-direction:column;gap:8px;">
+        <label class="f">Instructions (shown to the user)</label>
+        <textarea id="atInstructions" rows="3" placeholder="e.g. Download the app from the link above and send a screenshot of the install/signup screen"></textarea>
+        <label class="f">Screenshots Required</label>
+        <select id="atScreenshotCount">
+          <option value="1">1 screenshot</option>
+          <option value="2">2 screenshots</option>
+        </select>
+      </div>
+      <label class="f">Reward (Birr)</label>
+      <input id="atReward" type="number" placeholder="5">
+      <button class="btn gold" id="atSubmitBtn" onclick="saveTask()">+ Add Task</button>
+      <button class="btn ghost" id="atCancelBtn" style="display:none;margin-top:8px" onclick="cancelEditTask()">Cancel Edit</button>
+    </div>
+    <h2 class="sect">Existing Tasks (${tasks.length})</h2>
+    <div class="card" id="taskAdminList">
+      ${tasks.length ? tasks.map((t,i) => adminTaskRow(t, i, tasks.length)).join("") : `<div class="empty">No tasks yet.</div>`}
+    </div>
+  `;
+  window._tasksCache = tasks;
+  toggleManualFields();
+}
+function toggleManualFields(){
+  const box = document.getElementById("atManualFields");
+  const type = document.getElementById("atType")?.value;
+  if (box) box.style.display = type === "manual" ? "flex" : "none";
+  const titleInput = document.getElementById("atTitle");
+  if (titleInput && !titleInput.value){
+    titleInput.placeholder = type === "manual"
+      ? "e.g. Download Our App, or Complete This Task"
+      : "e.g. Join our News Channel";
+  }
+}
+async function reviewManualSubmission(id, approve){
+  try {
+    await api("/api/admin/tasks/manual_submissions/review", { id, approve });
+    toast(approve ? "✅ Approved & paid" : "❌ Rejected");
+    await paintAdminBody();
+  } catch (e){
+    toast("❌ Couldn't process — try again");
+  }
+}
+async function reviewUserTask(id, approve){
+  try {
+    await api("/api/admin/tasks/review", { id, approve });
+    toast(approve ? "✅ Task approved" : "❌ Task rejected & refunded");
+    await paintAdminBody();
+  } catch (e){
+    toast("❌ Couldn't process — try again");
+  }
+}
+function adminTaskRow(t, i, total){
+  const typeTag = t.task_type === "force" ? `<span class="pill-tag force">FORCE</span>`
+    : t.task_type === "manual" ? `<span class="pill-tag" style="background:#2d3f8f;color:#a8c2ff">MANUAL</span>`
+    : `<span class="pill-tag fake">FAKE</span>`;
+  const activeTag = t.is_active ? "" : `<span class="mini" style="color:#f87171"> (inactive)</span>`;
+  return `
+    <div class="list-item">
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:.82rem">${escapeHtml(t.title)} ${typeTag}${activeTag}</div>
+        <div class="mini">Reward: ${fmt(t.reward)} Birr</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0">
+        <button class="btn sm ghost" style="width:auto" onclick="moveTask(${t.id},-1)" ${i===0?"disabled":""}>↑</button>
+        <button class="btn sm ghost" style="width:auto" onclick="moveTask(${t.id},1)" ${i===total-1?"disabled":""}>↓</button>
+        <button class="btn sm ghost" style="width:auto" onclick="toggleTask(${t.id},${t.is_active?0:1})">${t.is_active?"⏸":"▶"}</button>
+        <button class="btn sm ghost" style="width:auto" onclick="editTask(${t.id})">✏️</button>
+        <button class="btn sm danger" style="width:auto" onclick="deleteTask(${t.id})">🗑</button>
+      </div>
+    </div>
+  `;
+}
+// Prefills the Add-Task form with an existing task's current values so
+// the admin can fix a typo (title, link, reward, instructions, etc.)
+// without deleting and recreating the task. Submitting while in this
+// mode calls /api/admin/tasks/update instead of /create — see saveTask().
+function editTask(id){
+  const t = (window._tasksCache || []).find(x => x.id === id);
+  if (!t) return toast("⚠️ Couldn't find that task — try reloading.");
+  window._editingTaskId = id;
+  document.getElementById("atFormHeading").textContent = "✏️ Editing Task";
+  document.getElementById("atTitle").value = t.title || "";
+  document.getElementById("atType").value = t.task_type || "fake";
+  document.getElementById("atChannelId").value = t.channel_id || "";
+  document.getElementById("atLink").value = t.invite_link || "";
+  document.getElementById("atReward").value = t.reward ?? "";
+  document.getElementById("atInstructions").value = t.instructions || "";
+  document.getElementById("atScreenshotCount").value = String(t.screenshot_count || 1);
+  toggleManualFields();
+  const btn = document.getElementById("atSubmitBtn");
+  if (btn) btn.textContent = "💾 Save Changes";
+  const cancelBtn = document.getElementById("atCancelBtn");
+  if (cancelBtn) cancelBtn.style.display = "block";
+  document.getElementById("atFormCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelEditTask(){
+  window._editingTaskId = null;
+  const heading = document.getElementById("atFormHeading");
+  if (heading) heading.textContent = "Add New Task";
+  ["atTitle","atChannelId","atLink","atReward","atInstructions"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const type = document.getElementById("atType");
+  if (type) type.value = "fake";
+  const count = document.getElementById("atScreenshotCount");
+  if (count) count.value = "1";
+  toggleManualFields();
+  const btn = document.getElementById("atSubmitBtn");
+  if (btn) btn.textContent = "+ Add Task";
+  const cancelBtn = document.getElementById("atCancelBtn");
+  if (cancelBtn) cancelBtn.style.display = "none";
+}
+
+async function saveTask(){
+  const title = document.getElementById("atTitle").value.trim();
+  const task_type = document.getElementById("atType").value;
+  const channel_id = document.getElementById("atChannelId").value.trim();
+  const invite_link = document.getElementById("atLink").value.trim();
+  const reward = parseFloat(document.getElementById("atReward").value || 0);
+  if (!title) return toast("❌ Enter a title");
+  const payload = { title, task_type, channel_id, invite_link, reward };
+  if (task_type === "manual"){
+    payload.instructions = document.getElementById("atInstructions").value.trim();
+    payload.screenshot_count = parseInt(document.getElementById("atScreenshotCount").value, 10);
+  }
+  const editingId = window._editingTaskId;
+  try {
+    if (editingId){
+      await api("/api/admin/tasks/update", { id: editingId, ...payload });
+      toast("✅ Task updated");
+      paintAdminBody();
+      return;
+    }
+    const r = await api("/api/admin/tasks/create", payload);
+    toast("✅ Task added");
+    if (confirm(`Broadcast "${title}" to all users now?\n\nEveryone will get a message with an "Open App" button so they can jump in and do it.`)) {
+      toast("📤 Broadcasting…");
+      try {
+        const b = await api("/api/admin/tasks/broadcast", { task_id: r.task_id });
+        toast(`✅ Announced to ${b.sent} users (${b.failed} failed)`);
+      } catch (e){ toast("❌ Broadcast failed: " + e.message); }
+    }
+    paintAdminBody();
+  } catch (e){ toast("❌ " + e.message); }
+}
+async function deleteTask(id){
+  await api("/api/admin/tasks/delete", { id });
+  toast("🗑 Task deleted");
+  paintAdminBody();
+}
+async function toggleTask(id, newState){
+  await api("/api/admin/tasks/update", { id, is_active: newState });
+  paintAdminBody();
+}
+async function moveTask(id, dir){
+  const tasks = window._tasksCache || [];
+  const idx = tasks.findIndex(t => t.id === id);
+  const swapWith = idx + dir;
+  if (swapWith < 0 || swapWith >= tasks.length) return;
+  [tasks[idx], tasks[swapWith]] = [tasks[swapWith], tasks[idx]];
+  await api("/api/admin/tasks/reorder", { order: tasks.map(t => t.id) });
+  paintAdminBody();
+}
+
+/* ── Admin: Gate Channels (mandatory to use the bot) ─────────────── */
+async function adminChannels(body){
+  const { channels } = await api("/api/admin/channels/list");
+  body.innerHTML = `
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        🔴 <b>Force Join</b> = bot must be admin there, real membership check.<br>
+        🟡 <b>Fake Join</b> = no real check, just shown as a required step.
+      </div>
+      <label class="f">Type</label>
+      <select id="acType">
+        <option value="0">🔴 Force Join (real check)</option>
+        <option value="1">🟡 Fake Join (no check)</option>
+      </select>
+      <label class="f">Channel ID (required for Force Join)</label>
+      <input id="acId" placeholder="-1001234567890">
+      <label class="f">Display Name</label>
+      <input id="acName" placeholder="My Channel">
+      <label class="f">Invite Link</label>
+      <input id="acLink" placeholder="https://t.me/yourchannel">
+      <button class="btn gold" onclick="createChannel()">+ Add Gate Channel</button>
+    </div>
+    <h2 class="sect">Gate Channels (${channels.length})</h2>
+    <div class="card">
+      ${channels.length ? channels.map(c => `
+        <div class="list-item">
+          <div>
+            <div style="font-weight:700;font-size:.82rem">${escapeHtml(c.channel_name)}
+              <span class="pill-tag ${c.bot_added ? 'fake' : 'force'}">${c.bot_added ? 'FAKE' : 'FORCE'}</span>
+            </div>
+            <div class="mini">${escapeHtml(c.invite_link)}</div>
+            ${c.channel_id ? `<div class="mini">ID: <code>${escapeHtml(c.channel_id)}</code></div>` : ""}
+          </div>
+          <button class="btn sm danger" style="width:auto" onclick="deleteChannel(${c.id})">🗑</button>
+        </div>
+      `).join("") : `<div class="empty">No gate channels yet.</div>`}
+    </div>
+  `;
+}
+async function createChannel(){
+  const bot_added = parseInt(document.getElementById("acType").value);
+  const channel_id = document.getElementById("acId").value.trim();
+  const channel_name = document.getElementById("acName").value.trim();
+  const invite_link = document.getElementById("acLink").value.trim();
+  if (!channel_name || !invite_link) return toast("❌ Fill name & link");
+  try {
+    await api("/api/admin/channels/create", { bot_added, channel_id, channel_name, invite_link });
+    toast("✅ Channel added");
+    paintAdminBody();
+  } catch (e){ toast("❌ " + e.message); }
+}
+async function deleteChannel(id){
+  await api("/api/admin/channels/delete", { id });
+  toast("🗑 Removed");
+  paintAdminBody();
+}
+
+/* ── Admin: Withdrawals ───────────────────────────────────────── */
+async function adminWithdrawals(body){
+  const { withdrawals } = await api("/api/admin/withdrawals/list");
+  body.innerHTML = `
+    <h2 class="sect" style="margin-top:0">Pending (${withdrawals.length})</h2>
+    <div class="card">
+      ${withdrawals.length ? withdrawals.map(w => {
+        const isBinance = w.method === "binance";
+        const label = isBinance ? `${BINANCE_ICON_SVG} Binance Pay` : escapeHtml(w.full_name);
+        const sub = isBinance ? `UID ${w.user_id} · Binance UID: ${escapeHtml(w.binance_uid)}` : `UID ${w.user_id} · ${escapeHtml(w.phone)}`;
+        return `
+        <div class="list-item">
+          <div>
+            <div style="font-weight:700;font-size:.82rem">${fmt(w.amount)} Birr — ${label}</div>
+            <div class="mini">${sub}</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            <button class="btn sm ghost" style="width:auto;background:rgba(200,242,77,.15);color:var(--lime)" onclick="approveWd(${w.id},'both')" title="Approve — notify user + channel">✓ Both</button>
+            <button class="btn sm ghost" style="width:auto;background:rgba(47,141,250,.15);color:#2f8dfa" onclick="approveWd(${w.id},'channel_only')" title="Approve — channel only, no DM to user">📢</button>
+            <button class="btn sm danger" style="width:auto" onclick="rejectWd(${w.id})">✕</button>
+          </div>
+        </div>
+      `;}).join("") : `<div class="empty">No pending withdrawals.</div>`}
+    </div>
+  `;
+}
+async function approveWd(id, notify_mode = "both"){
+  const run = async () => {
+    try {
+      await api("/api/admin/withdrawals/approve", { id, notify_mode });
+      toast(notify_mode === "channel_only" ? "✅ Completed — channel only" : "✅ Completed — user notified");
+      paintAdminBody();
+    } catch (e){ toast("❌ " + e.message); }
+  };
+  const msg = "Approve this withdrawal? This will send the payout and cannot be undone.";
+  if (tg?.showConfirm) {
+    tg.showConfirm(msg, (confirmed) => { if (confirmed) run(); });
+  } else if (confirm(msg)) {
+    run();
+  }
+}
+async function rejectWd(id){
+  const reason = prompt("Rejection reason:") || "No reason given.";
+  await api("/api/admin/withdrawals/reject", { id, reason });
+  toast("❌ Rejected & refunded");
+  paintAdminBody();
+}
+
+/* ── Admin: Users ─────────────────────────────────────────────── */
+async function adminUsers(body){
+  body.innerHTML = `
+    <div class="card">
+      <label class="f">Telegram User ID</label>
+      <input id="auId" type="number" placeholder="123456789">
+      <button class="btn ghost" onclick="searchUser()">🔍 Search</button>
+      <div id="userResult" style="margin-top:12px"></div>
+    </div>
+  `;
+}
+async function searchUser(){
+  const uid = parseInt(document.getElementById("auId").value);
+  if (!uid) return toast("❌ Enter a user ID");
+  const box = document.getElementById("userResult");
+  try {
+    const u = await api("/api/admin/users/search", { user_id: uid });
+    box.innerHTML = `
+      <div class="list-item">
+        <div>
+          <div style="font-weight:700">${escapeHtml(u.full_name)} ${u.username ? '@'+escapeHtml(u.username) : ''}</div>
+          <div class="mini">Balance: ${fmt(u.balance)} · Refs: ${u.referrals} · ${u.is_banned ? '🚫 Banned' : '✅ Active'}</div>
+        </div>
+      </div>
+      <div class="row2" style="margin-top:10px">
+        <button class="btn sm ${u.is_banned ? '' : 'danger'}" onclick="toggleBan(${uid}, ${u.is_banned ? 0 : 1})">${u.is_banned ? '✅ Unban' : '🚫 Ban'}</button>
+        <button class="btn sm ghost" onclick="adjustBalance(${uid})">✍️ Adjust Balance</button>
+      </div>
+    `;
+  } catch (e){ box.innerHTML = `<div class="empty">User not found.</div>`; }
+}
+async function toggleBan(uid, banned){
+  await api("/api/admin/users/ban", { user_id: uid, banned });
+  toast(banned ? "🚫 Banned" : "✅ Unbanned");
+  searchUser();
+}
+async function adjustBalance(uid){
+  const amt = parseFloat(prompt("Amount to add (negative to subtract):") || "0");
+  if (!amt) return;
+  await api("/api/admin/users/balance", { user_id: uid, amount: amt });
+  toast("✅ Balance updated");
+  searchUser();
+}
+
+/* ── Admin: Ads Analytics ─────────────────────────────────────── */
+async function adminAds(body){
+  let a;
+  try {
+    a = await api("/api/admin/ads/analytics");
+  } catch (e) {
+    body.innerHTML = `<div class="empty">Couldn't load ad analytics.</div>`;
+    return;
+  }
+
+  const userRow = (u) => `
+    <div class="list-item">
+      <div>
+        <div style="font-weight:700">${escapeHtml(u.full_name || "—")} ${u.username ? "@"+escapeHtml(u.username) : ""}</div>
+        <div class="mini">ID: ${u.user_id}</div>
+      </div>
+      <div class="mini" style="font-family:'JetBrains Mono',monospace;color:var(--lime)">${u.watched}</div>
+    </div>`;
+
+  const breakdownRow = (u) => `
+    <div class="list-item">
+      <div>
+        <div style="font-weight:700">${escapeHtml(u.full_name || "—")} ${u.username ? "@"+escapeHtml(u.username) : ""}</div>
+        <div class="mini">ID: ${u.user_id}</div>
+      </div>
+      <div class="mini" style="font-family:'JetBrains Mono',monospace;color:${u.reached_limit ? "var(--lime)" : "inherit"}">
+        ${u.reached_limit ? "✅ " : ""}${u.watched}/${u.limit}
+      </div>
+    </div>`;
+
+  const videoLimitList = a.video_limit_reached_users.length
+    ? a.video_limit_reached_users.map(userRow).join("")
+    : `<div class="empty">No one has hit the Watch Ad daily limit today.</div>`;
+
+  const dlLimitList = a.direct_link_limit_reached_users.length
+    ? a.direct_link_limit_reached_users.map(userRow).join("")
+    : `<div class="empty">No one has hit the Direct Link daily limit today.</div>`;
+
+  const videoBreakdownList = (a.video_breakdown || []).length
+    ? a.video_breakdown.map(breakdownRow).join("")
+    : `<div class="empty">No one has watched a video ad today yet.</div>`;
+
+  const dlBreakdownList = (a.direct_link_breakdown || []).length
+    ? a.direct_link_breakdown.map(breakdownRow).join("")
+    : `<div class="empty">No one has opened a Direct Link ad today yet.</div>`;
+
+  body.innerHTML = `
+    <h2 class="sect" style="margin-top:0">🎬 Watch Ad — Today</h2>
+    <div class="card stat-row" style="margin-bottom:14px">
+      <div class="stat-box"><div class="n">${a.video_clicks_today}</div><div class="l">Clicked to Watch</div></div>
+      <div class="stat-box"><div class="n">${a.video_completed_today}</div><div class="l">Finished Watching</div></div>
+    </div>
+
+    <h2 class="sect">🎁 Daily Check-in Ad Views — Today</h2>
+    <div class="mini" style="margin:0 0 8px">These ad views confirm a check-in and are never counted toward the Watch Ad daily limit above.</div>
+    <div class="card stat-row" style="margin-bottom:14px">
+      <div class="stat-box"><div class="n">${a.checkin_ad_views_today}</div><div class="l">Ad Views</div></div>
+      <div class="stat-box"><div class="n">${a.checkin_ad_users_today}</div><div class="l">Unique Users</div></div>
+    </div>
+
+    <h2 class="sect">🔗 Direct Link — Today</h2>
+    <div class="card stat-row" style="margin-bottom:14px">
+      <div class="stat-box"><div class="n">${a.direct_link_opened_today}</div><div class="l">Opened Link</div></div>
+      <div class="stat-box"><div class="n">${a.direct_link_completed_today}</div><div class="l">Claimed Reward</div></div>
+    </div>
+
+    <h2 class="sect">📋 Everyone Who Watched — Today (Watch Ad)</h2>
+    <div class="mini" style="margin:0 0 8px">Shows every user's own count against today's limit, not just the ones who maxed out — top 200.</div>
+    <div class="card">${videoBreakdownList}</div>
+
+    <h2 class="sect">📋 Everyone Who Opened — Today (Direct Link)</h2>
+    <div class="card">${dlBreakdownList}</div>
+
+    <h2 class="sect">✅ Reached Watch Ad Daily Limit</h2>
+    <div class="card">${videoLimitList}</div>
+
+    <h2 class="sect">✅ Reached Direct Link Daily Limit</h2>
+    <div class="card">${dlLimitList}</div>
+  `;
+}
+
+/* ── Admin: Settings ──────────────────────────────────────────── */
+async function adminSettings(body){
+  let s;
+  try {
+    s = await api("/api/admin/settings");
+  } catch (e) {
+    body.innerHTML = `<div class="empty">Couldn't load settings. ${escapeHtml(e?.message || "")}</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="card">
+      <label class="f">Reward per Referral (Birr)</label>
+      <input id="stReward" type="number" value="${s.reward_per_referral ?? 10}">
+      <label class="f">Minimum Withdrawal (Birr)</label>
+      <input id="stMinWd" type="number" value="${s.min_withdrawal ?? 50}">
+      <label class="f">Minimum Ads Required for Withdrawal (0 to disable)</label>
+      <input id="stMinAdsWd" type="number" value="${s.min_ads_for_withdrawal ?? 30}">
+      <label class="f">💱 USDT Rate (Birr per 1 USDT) — Binance Pay</label>
+      <input id="stUsdtRate" type="number" step="0.01" value="${s.usdt_rate ?? 155}">
+      <label class="f">👨‍🔧 Support Telegram Username</label>
+      <input id="stSupportUser" type="text" placeholder="e.g. hf_support (no @)" value="${escapeHtml(s.support_username || '')}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <h2 class="sect" style="margin:0">AdsGram (Watch & Earn)</h2>
+      <button class="btn sm ghost" style="margin-top:14px" onclick="checkAdsgramConnection()">🔍 Check Connection</button>
+    </div>
+    <div id="adsgramCheckResult"></div>
+    <div class="card">
+      <label class="f">Enable Rewarded Ads</label>
+      <select id="stAdsEnabled">
+        <option value="0" ${!s.ads_enabled ? "selected" : ""}>Disabled</option>
+        <option value="1" ${s.ads_enabled ? "selected" : ""}>Enabled</option>
+      </select>
+      <label class="f">AdsGram Block ID</label>
+      <input id="stAdBlock" type="text" placeholder="e.g. 12345" value="${escapeHtml(s.adsgram_block_id || '')}">
+      <label class="f">🔒 Reward URL — paste into AdsGram's "Reward URL" field</label>
+      <input type="text" readonly onclick="this.select()" value="${BACKEND_URL}/api/ads/adsgram-reward?userid=[userId]&amp;secret=${escapeHtml(s.adsgram_s2s_secret || '')}" style="opacity:.75;font-size:.72rem">
+      <div class="mini" style="margin:-4px 0 10px">Server-generated — always required, so nobody can fake a reward call without it.</div>
+      <label class="f">Reward per Ad (Birr)</label>
+      <input id="stAdReward" type="number" step="0.1" value="${s.ad_reward_amount}">
+      <label class="f">Daily Limit per User</label>
+      <input id="stAdDaily" type="number" value="${s.ad_daily_limit}">
+      <label class="f">Cooldown Between Ads (seconds)</label>
+      <input id="stAdCooldown" type="number" value="${s.ad_cooldown_seconds}">
+      <label class="f">Ads per Batch (0 = off, batches disabled)</label>
+      <input id="stAdBatchSize" type="number" min="0" placeholder="e.g. 5" value="${s.ad_batch_size || 0}">
+      <label class="f">Wait Between Batches (minutes)</label>
+      <input id="stAdBatchCooldownMin" type="number" min="0" step="1" placeholder="e.g. 60" value="${Math.round((s.ad_batch_cooldown_seconds || 3600) / 60)}">
+      <div class="mini" style="margin:8px 0 0">
+        Splits the daily limit into batches — e.g. size 5 with a 60-minute
+        wait means: watch 5 ads back-to-back (normal cooldown above between
+        each), then wait 60 minutes before the 6th unlocks, watch 5 more,
+        wait again, and so on until the daily limit is reached. Set batch
+        size to 0 to turn this off and use a flat cooldown for every ad.
+      </div>
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">AdsGram Direct Link</h2>
+    <div class="card">
+      <label class="f">Direct Link URL</label>
+      <input id="stAdDirectLink" type="text" placeholder="https://...adsgram direct link" value="${escapeHtml(s.adsgram_direct_link || '')}">
+      <label class="f">Reward per Visit (Birr)</label>
+      <input id="stAdDlReward" type="number" step="0.1" value="${s.direct_link_reward_amount}">
+      <label class="f">Daily Limit per User</label>
+      <input id="stAdDlDaily" type="number" value="${s.direct_link_daily_limit}">
+      <label class="f">Wait Timer Before Claim (seconds)</label>
+      <input id="stAdDlWait" type="number" value="${s.direct_link_wait_seconds}">
+      <label class="f">Cooldown Between Visits (seconds)</label>
+      <input id="stAdDlCooldown" type="number" value="${s.direct_link_cooldown_seconds}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">Monetag (Fallback when AdsGram has no fill)</h2>
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        Optional. If set, the app tries Monetag automatically whenever AdsGram
+        reports no ad available — it uses the same reward/limit/cooldown
+        settings as AdsGram above.
+      </div>
+      <label class="f">Monetag SDK Script URL</label>
+      <input id="stMonetagUrl" type="text" placeholder="e.g. https://your-zone-domain.com/sdk.js" value="${escapeHtml(s.monetag_sdk_url || '')}">
+      <label class="f">Monetag Zone ID</label>
+      <input id="stMonetagZone" type="text" placeholder="e.g. 123456" value="${escapeHtml(s.monetag_zone_id || '')}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">Tads (Second ad — required before AdsGram pays out)</h2>
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        When on, right after a user finishes AdsGram's video ad, a Tads ad
+        is shown too. The AdsGram reward is only paid if the user also
+        completes the Tads ad — <b>unless Tads has no ad to show at all
+        (no-fill)</b>, in which case AdsGram alone still pays as usual.
+        If Tads has an ad and the user doesn't finish it, no reward is
+        paid even though AdsGram's own postback may still arrive.
+      </div>
+      <label class="f">Enabled</label>
+      <select id="stTadsEnabled">
+        <option value="0" ${!s.tads_enabled ? "selected" : ""}>Off — AdsGram pays on its own</option>
+        <option value="1" ${s.tads_enabled ? "selected" : ""}>On — require Tads too</option>
+      </select>
+      <label class="f">Tads Widget ID</label>
+      <input id="stTadsWidgetId" type="text" placeholder="e.g. 12345" value="${escapeHtml(s.tads_widget_id || '')}">
+      <label class="f">🔒 Webhook URL — paste into Tads' widget "Webhook URL" field (set method to POST)</label>
+      <input type="text" readonly onclick="this.select()" value="${BACKEND_URL}/api/ads/tads-webhook?secret=${escapeHtml(s.tads_webhook_secret || '')}" style="opacity:.75;font-size:.72rem">
+      <div class="mini" style="margin:-4px 0 10px">
+        Server-generated. Tads' own docs only document sending
+        telegram_id/widget_id as a JSON body on POST — there's no
+        confirmed macro/placeholder support for GET, so don't add
+        telegram_id or widget_id to this URL yourself; Tads sends them in
+        the request body automatically. Set the method dropdown in Tads
+        to <b>POST</b>. This is what actually confirms the ad was shown —
+        real S2S proof, same trust model as AdsGram's Reward URL above.
+      </div>
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">Referral Payout Skipping</h2>
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        When on, not every successful referral gets paid. In every batch of
+        "Batch Size" referrals a given user brings in, a random number of
+        them (between Min and Max) is silently skipped — still counted in
+        their "Referrals" stat, just not paid. Reduces payout cost without
+        the referrer being able to tell which invite was skipped.
+      </div>
+      <label class="f">Enabled</label>
+      <select id="stRefSkipEnabled">
+        <option value="0" ${!s.referral_skip_enabled ? "selected" : ""}>Off — pay every referral</option>
+        <option value="1" ${s.referral_skip_enabled ? "selected" : ""}>On</option>
+      </select>
+      <label class="f">Batch Size (e.g. 6 = every 6 referrals)</label>
+      <input id="stRefSkipBatch" type="number" min="2" value="${s.referral_skip_batch_size}">
+      <label class="f">Min Skipped per Batch</label>
+      <input id="stRefSkipMin" type="number" min="0" value="${s.referral_skip_min}">
+      <label class="f">Max Skipped per Batch</label>
+      <input id="stRefSkipMax" type="number" min="0" value="${s.referral_skip_max}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">User Self-Serve Tasks (promote own channel)</h2>
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        Lets any user pay from their own balance to advertise their own
+        channel as a task. Submissions need your approval before going live
+        (see the "Tasks" tab for pending review).
+      </div>
+      <label class="f">Enabled</label>
+      <select id="stUtcEnabled">
+        <option value="0" ${!s.user_task_creation_enabled ? "selected" : ""}>Off</option>
+        <option value="1" ${s.user_task_creation_enabled ? "selected" : ""}>On</option>
+      </select>
+      <label class="f">Min Reward per Person (Birr)</label>
+      <input id="stUtcMinReward" type="number" step="0.1" value="${s.user_task_min_reward}">
+      <label class="f">Max Reward per Person (Birr)</label>
+      <input id="stUtcMaxReward" type="number" step="0.1" value="${s.user_task_max_reward}">
+      <label class="f">Min People per Task</label>
+      <input id="stUtcMinSlots" type="number" value="${s.user_task_min_slots}">
+      <label class="f">Max People per Task</label>
+      <input id="stUtcMaxSlots" type="number" value="${s.user_task_max_slots}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">Ad Reward Skip Reminder</h2>
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        Controls the "odd/even" ad-reward pattern (1st, 3rd, 5th... view
+        doesn't pay; 2nd, 4th, 6th... does) and the message shown when a
+        view isn't confirmed. When Skip Mechanism is Off, every view is
+        genuinely a delivery issue when unconfirmed, so Network Error Text
+        is always shown instead. When On, the Show dropdown picks between
+        Reminder Text and Disguise Text.
+      </div>
+      <label class="f">Skip Mechanism</label>
+      <select id="stAdReminderEnabled">
+        <option value="0" ${!s.ad_click_reminder_enabled ? "selected" : ""}>Off — pay every ad view</option>
+        <option value="1" ${s.ad_click_reminder_enabled ? "selected" : ""}>On — alternate odd/even</option>
+      </select>
+      <label class="f">Show (when Skip Mechanism is On)</label>
+      <select id="stAdReminderDisguised">
+        <option value="0" ${!s.ad_click_reminder_disguised ? "selected" : ""}>Reminder Text</option>
+        <option value="1" ${s.ad_click_reminder_disguised ? "selected" : ""}>Disguise Text</option>
+      </select>
+      <label class="f">Reminder Text</label>
+      <input id="stAdReminderText" type="text" value="${escapeHtml(s.ad_click_reminder_text || '')}">
+      <label class="f">Disguise Text</label>
+      <input id="stAdReminderDisguiseText" type="text" value="${escapeHtml(s.ad_click_reminder_disguise_text || '')}">
+      <label class="f">Network Error Text (shown when Skip Mechanism is Off)</label>
+      <input id="stAdReminderNetworkText" type="text" value="${escapeHtml(s.ad_click_reminder_network_text || '')}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">Require Real Banner Click</h2>
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        Extra gate on top of the Skip Reminder above. When On, the app
+        must detect that the user's Telegram Mini App was actually
+        backgrounded (they left the screen for the ad's banner/link —
+        opened a browser, another bot, or a channel) while the ad was
+        showing. If no such signal arrives, AdsGram's reward postback is
+        ignored and nothing is paid, even if AdsGram itself reports the
+        ad as completed. This is real navigation-away detection, not the
+        odd/even trick above — but it can't be 100% proven either, since
+        no ad network sends us a genuine "banner click" webhook.
+      </div>
+      <label class="f">Require Real Click</label>
+      <select id="stAdRequireBannerClick">
+        <option value="0" ${!s.ad_require_banner_click ? "selected" : ""}>Off — trust AdsGram's own signal</option>
+        <option value="1" ${s.ad_require_banner_click ? "selected" : ""}>On — require detected click-away</option>
+      </select>
+      <label class="f">Click Signal Validity Window (seconds)</label>
+      <input id="stAdBannerClickWindow" type="number" min="10" value="${s.ad_banner_click_window_seconds ?? 120}">
+      <div class="mini" style="margin:12px 0 10px">
+        CTR control — once today's count of rewards actually gated on a
+        verified click reaches the cap below, the Require Real Click gate
+        above quietly relaxes for the rest of the day (pays every ad view,
+        clicked or not) so AdsGram doesn't see a suspiciously high
+        confirmed-click ratio all day. Resets automatically at midnight.
+        Today so far: <b>${s.ad_banner_click_rewards_today ?? 0}</b>.
+      </div>
+      <label class="f">CTR Cap</label>
+      <select id="stAdBannerClickCapEnabled">
+        <option value="0" ${!s.ad_banner_click_cap_enabled ? "selected" : ""}>Off — always require click when gate is On</option>
+        <option value="1" ${s.ad_banner_click_cap_enabled ? "selected" : ""}>On — relax to pay-every-view after daily cap</option>
+      </select>
+      <label class="f">Daily Cap (verified-click rewards)</label>
+      <input id="stAdBannerClickCap" type="number" min="1" value="${s.ad_banner_click_daily_cap ?? 124}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <h2 class="sect">Daily Check-in</h2>
+    <div class="card">
+      <div class="mini" style="margin-bottom:10px">
+        Once-a-day bonus: user watches one ad, then claims a fixed reward.
+        Streak count increases on consecutive days.
+      </div>
+      <label class="f">Enabled</label>
+      <select id="stDailyCheckEnabled">
+        <option value="0" ${!s.daily_checkin_enabled ? "selected" : ""}>Off</option>
+        <option value="1" ${s.daily_checkin_enabled ? "selected" : ""}>On</option>
+      </select>
+      <label class="f">Reward per Check-in (Birr)</label>
+      <input id="stDailyCheckReward" type="number" step="0.1" value="${s.daily_checkin_reward}">
+      <label class="f">"Couldn't Confirm" Message</label>
+      <input id="stDailyCheckReminderText" type="text" value="${escapeHtml(s.daily_checkin_reminder_text || '')}">
+      <button class="btn gold" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+  `;
+}
+function _num(id, fallback, isInt){
+  const raw = document.getElementById(id).value;
+  const v = isInt ? parseInt(raw, 10) : parseFloat(raw);
+  return Number.isFinite(v) ? v : fallback;
+}
+async function saveSettings(){
+  const reward_per_referral = _num("stReward", 10, false);
+  const min_withdrawal = _num("stMinWd", 50, false);
+  const min_ads_for_withdrawal = _num("stMinAdsWd", 30, true);
+  const usdt_rate = _num("stUsdtRate", 155, false);
+  const support_username = document.getElementById("stSupportUser").value.trim().replace(/^@/, "");
+  const ads_enabled = document.getElementById("stAdsEnabled").value === "1";
+  const adsgram_block_id = document.getElementById("stAdBlock").value.trim();
+  const ad_reward_amount = _num("stAdReward", 0.5, false);
+  const ad_daily_limit = _num("stAdDaily", 10, true);
+  const ad_cooldown_seconds = _num("stAdCooldown", 30, true);
+  const ad_batch_size = _num("stAdBatchSize", 0, true);
+  const ad_batch_cooldown_seconds = _num("stAdBatchCooldownMin", 60, true) * 60;
+  const adsgram_direct_link = document.getElementById("stAdDirectLink").value.trim();
+  const direct_link_reward_amount = _num("stAdDlReward", 0.3, false);
+  const direct_link_daily_limit = _num("stAdDlDaily", 10, true);
+  const direct_link_wait_seconds = _num("stAdDlWait", 15, true);
+  const direct_link_cooldown_seconds = _num("stAdDlCooldown", 30, true);
+  const monetag_sdk_url = document.getElementById("stMonetagUrl").value.trim();
+  const monetag_zone_id = document.getElementById("stMonetagZone").value.trim();
+  const tads_enabled = document.getElementById("stTadsEnabled").value === "1";
+  const tads_widget_id = document.getElementById("stTadsWidgetId").value.trim();
+  const referral_skip_enabled = document.getElementById("stRefSkipEnabled").value === "1";
+  const referral_skip_batch_size = _num("stRefSkipBatch", 6, true);
+  const referral_skip_min = _num("stRefSkipMin", 1, true);
+  const referral_skip_max = _num("stRefSkipMax", 3, true);
+  const user_task_creation_enabled = document.getElementById("stUtcEnabled").value === "1";
+  const user_task_min_reward = _num("stUtcMinReward", 1, false);
+  const user_task_max_reward = _num("stUtcMaxReward", 20, false);
+  const user_task_min_slots = _num("stUtcMinSlots", 5, true);
+  const user_task_max_slots = _num("stUtcMaxSlots", 500, true);
+  const ad_click_reminder_enabled = document.getElementById("stAdReminderEnabled").value === "1";
+  const ad_click_reminder_disguised = document.getElementById("stAdReminderDisguised").value === "1";
+  const ad_click_reminder_text = document.getElementById("stAdReminderText").value.trim();
+  const ad_click_reminder_disguise_text = document.getElementById("stAdReminderDisguiseText").value.trim();
+  const ad_click_reminder_network_text = document.getElementById("stAdReminderNetworkText").value.trim();
+  const ad_require_banner_click = document.getElementById("stAdRequireBannerClick").value === "1";
+  const ad_banner_click_window_seconds = _num("stAdBannerClickWindow", 120, true);
+  const ad_banner_click_cap_enabled = document.getElementById("stAdBannerClickCapEnabled").value === "1";
+  const ad_banner_click_daily_cap = _num("stAdBannerClickCap", 124, true);
+  const daily_checkin_enabled = document.getElementById("stDailyCheckEnabled").value === "1";
+  const daily_checkin_reward = _num("stDailyCheckReward", 5, false);
+  const daily_checkin_reminder_text = document.getElementById("stDailyCheckReminderText").value.trim();
+  try {
+    await api("/api/admin/settings/update", {
+      reward_per_referral, min_withdrawal, min_ads_for_withdrawal, usdt_rate, support_username,
+      ads_enabled, adsgram_block_id, ad_reward_amount, ad_daily_limit, ad_cooldown_seconds,
+      ad_batch_size, ad_batch_cooldown_seconds,
+      adsgram_direct_link, direct_link_reward_amount, direct_link_daily_limit,
+      direct_link_wait_seconds, direct_link_cooldown_seconds,
+      monetag_sdk_url, monetag_zone_id,
+      tads_enabled, tads_widget_id,
+      referral_skip_enabled, referral_skip_batch_size, referral_skip_min, referral_skip_max,
+      user_task_creation_enabled, user_task_min_reward, user_task_max_reward,
+      user_task_min_slots, user_task_max_slots,
+      ad_click_reminder_enabled, ad_click_reminder_disguised,
+      ad_click_reminder_text, ad_click_reminder_disguise_text, ad_click_reminder_network_text,
+      ad_require_banner_click, ad_banner_click_window_seconds,
+      ad_banner_click_cap_enabled, ad_banner_click_daily_cap,
+      daily_checkin_enabled, daily_checkin_reward, daily_checkin_reminder_text,
+    });
+    toast("✅ Settings saved");
+    refreshMe();
+  } catch (e) {
+    toast(`❌ Save failed: ${e?.message || "unknown error"}`);
+  }
+}
+async function checkAdsgramConnection(){
+  const box = document.getElementById("adsgramCheckResult");
+  box.innerHTML = `<div class="mini" style="padding:8px 2px">Checking…</div>`;
+  // BUG-REPORT #15: the backend used to report sdk_script_present as a
+  // hardcoded true, so this row was a false positive — the SDK is
+  // lazy-loaded in THIS WebView and can genuinely fail (blocked domain,
+  // no VPN, slow network). Only the client can know; check the real
+  // thing (and give the lazy loader a chance to finish first).
+  const sdkLoaded = !!window.Adsgram || (await ensureAdsgramSdk().catch(() => false)) || !!window.Adsgram;
+  try {
+    const r = await api("/api/admin/ads/verify");
+    const row = (ok, label) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+        <span>${ok ? "✅" : "❌"}</span><span class="mini">${label}</span>
+      </div>`;
+    box.innerHTML = `
+      <div class="card" style="padding:12px 14px;">
+        ${row(sdkLoaded, "AdsGram SDK script loaded in Mini App")}
+        ${row(r.ads_enabled, "Ads enabled in settings")}
+        ${row(r.block_id_configured, "Block ID configured (rewarded video)")}
+        ${row(r.direct_link_configured, "Direct Link URL configured")}
+        ${row(r.direct_link_valid_url, "Direct Link URL looks valid")}
+        ${row(r.monetag_configured, "Monetag zone/URL configured (fallback)")}
+        ${row(r.tads_configured, "Tads widget ID configured (second ad gate)")}
+        <div style="margin-top:8px;font-weight:700;font-size:.82rem">
+          ${r.video_ready ? "✅ Rewarded video is live" : "⚠️ Rewarded video not fully configured"}<br>
+          ${r.direct_link_ready ? "✅ Direct Link is live" : "⚠️ Direct Link not fully configured"}<br>
+          ${r.monetag_ready ? "✅ Monetag fallback is live" : "⚠️ Monetag fallback not configured (optional)"}<br>
+          ${r.tads_ready ? "✅ Tads gate is live" : "⚠️ Tads gate not configured (optional)"}
+        </div>
+      </div>`;
+  } catch (e){
+    box.innerHTML = `<div class="empty">Couldn't run the check.</div>`;
+  }
+}
+
+/* ── Admin: Broadcast ─────────────────────────────────────────── */
+async function adminBroadcast(body){
+  body.innerHTML = `
+    <div class="card">
+      <label class="f">Message to all users</label>
+      <textarea id="bcText" rows="5" placeholder="Type your announcement…"></textarea>
+      <button class="btn gold" onclick="sendBroadcast()">📢 Send Broadcast</button>
+    </div>
+  `;
+}
+async function sendBroadcast(){
+  const text = document.getElementById("bcText").value.trim();
+  if (!text) return toast("❌ Enter a message");
+  if (!confirm("Send this to ALL users?")) return;
+  toast("📤 Sending…");
+  const r = await api("/api/admin/broadcast", { text });
+  toast(`✅ Sent to ${r.sent} users (${r.failed} failed)`);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FORCE-CHANNEL GATE (blocks dashboard until real channels are joined)
+   ══════════════════════════════════════════════════════════════════ */
+let GATE = { force_unjoined: [], fake_channels: [], fake_seen: true };
+
+async function loadGateStatus(){
+  GATE = await api("/api/gate/status");
+  return GATE;
+}
+
+function paintGate(){
+  const list = document.getElementById("gateList");
+  list.innerHTML = GATE.force_unjoined.map((c, i) => `
+    <div class="gate-ch" style="animation-delay:${i * 0.07}s">
+      <div class="gc-ic">📢</div>
+      <div class="gc-name">${escapeHtml(c.channel_name)}</div>
+      <a class="btn gold" href="${c.invite_link}" target="_blank" onclick="tg?.HapticFeedback?.impactOccurred('light')">Join</a>
+    </div>
+  `).join("");
+}
+
+async function recheckGate(){
+  const btn = document.getElementById("gateRecheckBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin-ico"></span> Checking…`;
+  try {
+    await loadGateStatus();
+    if (GATE.force_unjoined.length === 0){
+      tg?.HapticFeedback?.notificationOccurred("success");
+      toast("✅ Verified! Welcome in.");
+      document.getElementById("gate").style.display = "none";
+      await render();
+    } else {
+      paintGate();
+      toast("❌ Still missing " + GATE.force_unjoined.length + " channel(s). Join then try again.");
+    }
+  } catch (e){
+    toast("⚠️ Couldn't verify. Try again.");
+  }
+  btn.disabled = false;
+  btn.innerHTML = "✅ I've Joined";
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════════════════════════════ */
+(async () => {
+  const MIN_SPLASH_MS = 300; // just enough to avoid a jarring flash on very fast connections
+  const started = Date.now();
+  const splash = document.getElementById("splash");
+
+  function dismissSplash(){
+    const elapsed = Date.now() - started;
+    const wait = Math.max(0, MIN_SPLASH_MS - elapsed);
+    setTimeout(() => {
+      splash.classList.add("hide");
+      setTimeout(() => {
+        const v = document.getElementById("view");
+        if (v) v.classList.add("revealed");
+      }, 80);
+    }, wait);
+  }
+
+  // ── Telegram-only gate ──────────────────────────────────────────
+  // If this page wasn't opened from inside Telegram (no Telegram.WebApp,
+  // or it has no initData — e.g. someone copied the link into a normal
+  // browser), stop here. No /api/* call is made at all in this case, so
+  // no balance or personal data is ever fetched into a non-Telegram
+  // browser.
+  if (!tg || !tg.initData) {
+    splash.classList.add("hide");
+    const link = document.getElementById("openInTgBtn");
+    if (link) link.href = `https://t.me/${BOT_USERNAME}`;
+    document.getElementById("notTg").style.display = "flex";
+    return;
+  }
+
+  try {
+    await refreshMe();
+
+    if (!ME.is_admin){
+      await loadGateStatus();
+      if (GATE.force_unjoined.length > 0){
+        paintGate();
+        dismissSplash();
+        document.getElementById("gate").style.display = "flex";
+        return; // dashboard stays locked until recheckGate() succeeds
+      }
+    }
+
+    if (FORCE_ADMIN_TAB && ME.is_admin){
+      currentTab = "admin";
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === "admin"));
+    }
+    // Only set right here, right before the render() call that's about to
+    // consume it (and only when that call will actually reach
+    // renderHome() — currentTab could be "admin" via FORCE_ADMIN_TAB
+    // above). Setting it any earlier risks it surviving an early return
+    // (e.g. the gate branch above) or a non-home first tab, and then
+    // wrongly skipping a real refetch much later — a stale-balance bug.
+    if (currentTab === "home") _skipNextMeRefetch = true;
+    resumeMonetagPendingOnLoad(); // re-arm any Monetag bonus ad left pending from before the app was last closed
+    await render();
+    dismissSplash();
+  } catch (e) {
+    if (e.message === "not_verified"){
+      // This account has never completed the verification page — most
+      // commonly because the Mini App was opened via Telegram's native
+      // bot-profile "Open App" button (or any other direct link) instead
+      // of the bot's own "Open Mini App" flow, so index.html's channel
+      // gate / fingerprint / VPN checks never ran. Send them there now
+      // instead of leaving them stuck on a dead-end error.
+      const tgUid = tg?.initDataUnsafe?.user?.id;
+      const startParam = tg?.initDataUnsafe?.start_param || "";
+      if (tgUid){
+        const qs = new URLSearchParams({ uid: String(tgUid) });
+        if (/^\d+$/.test(startParam)) qs.set("ref", startParam);
+        location.replace(`index.html?${qs.toString()}`);
+        return;
+      }
+    }
+    document.getElementById("view").innerHTML =
+      `<div class="empty">⚠️ ${e.message === "banned" ? "Your account has been banned." : "Couldn't load your data. Please reopen from the bot."}</div>`;
+    dismissSplash();
+  }
+})();
+</script>
+</body>
+</html>
