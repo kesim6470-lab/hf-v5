@@ -1,20 +1,50 @@
-import { api, fmt, tg } from "../api";
+import { fmt, tg } from "../api";
 import { useApp } from "../App";
 
-/** Invite / Friends: referral stats, copyable link, Telegram share, and
- *  the backend-built share card (photo + caption DM'd by the bot). */
+/** Invite / Friends: referral stats, copyable link, and the Telegram
+ *  invite-card picker.
+ *
+ *  Flow the owner asked for: tap "Invite Friends" -> Telegram opens its
+ *  chat picker -> the user selects the person/group they want -> the
+ *  Anon Earn invite CARD (photo + caption + Join button, built by the
+ *  backend's inline-query handler) appears -> they tap the card and it
+ *  is sent into that chat. That is tg.switchInlineQuery(): it is NOT a
+ *  single fixed recipient, and unlike a forwarded DM the card's Join
+ *  button survives, because the bot itself sends the card into the
+ *  chosen chat. Fallback (older Telegram clients without
+ *  switchInlineQuery): the t.me/share/url picker with the same wording
+ *  as plain text. */
 export default function Invite() {
   const { me, toast } = useApp();
   if (!me) return <div className="empty">Loading…</div>;
 
-  async function shareCard() {
+  const referralLink = me.referral_link;
+
+  const inviteText =
+    "🪙 ANON EARN — Birr, little by little, every day.\n\n" +
+    "No deposit. No investment. I earn here from my phone:\n" +
+    "🎬 clips I watch turn into Birr\n" +
+    "🎯 small missions, quick rewards\n" +
+    "🔥 a daily streak that keeps paying\n" +
+    "👥 friends I bring in earn me more\n\n" +
+    "Payouts go to Telebirr or Binance Pay.\n\n" +
+    "Your turn — start free 👇\n" +
+    referralLink;
+
+  function inviteFriends() {
     try {
-      await api("/api/invite/share_card");
-      toast("📨 Invite card sent to your chat with the bot — forward it to friends!");
-    } catch (e: any) {
-      if (String(e?.message).startsWith("cooldown:")) {
-        toast(`⏳ Share card on cooldown — ${Math.ceil(Number(e.message.split(":")[1]) / 60)} min left`);
-      } else toast(e?.message || "Couldn't send the card");
+      if (tg && typeof tg.switchInlineQuery === "function") {
+        tg.switchInlineQuery("", ["users", "bots", "groups", "channels"]);
+        return;
+      }
+    } catch { /* fall through to the share picker */ }
+    if (tg && typeof tg.openTelegramLink === "function") {
+      tg.openTelegramLink(
+        "https://t.me/share/url?url=&text=" + encodeURIComponent(inviteText)
+      );
+    } else {
+      navigator.clipboard?.writeText(referralLink);
+      toast("Link copied 📋");
     }
   }
 
@@ -32,18 +62,17 @@ export default function Invite() {
           link and completes verification.
         </div>
       </div>
+      <button className="btn" style={{ marginTop: 14, width: "100%" }} onClick={inviteFriends}>
+        📤 Invite Friends — Pick a Chat
+      </button>
+      <div className="empty" style={{ marginTop: 8 }}>
+        Pick a friend or group, then tap the Anon Earn card to send it there.
+      </div>
       <h3 className="sect">🔗 Your Referral Link</h3>
-      <div className="ref-box">{me.referral_link}</div>
-      <button className="btn" onClick={() => { navigator.clipboard?.writeText(me.referral_link); toast("Link copied 📋"); }}>
+      <div className="ref-box">{referralLink}</div>
+      <button className="btn ghost" onClick={() => { navigator.clipboard?.writeText(referralLink); toast("Link copied 📋"); }}>
         📋 Copy link
       </button>
-      <button className="btn ghost" onClick={() => {
-        if (tg) tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(me.referral_link) + "&text=" + encodeURIComponent("Join Anon Earn and earn Birr daily!"));
-        else { navigator.clipboard?.writeText(me.referral_link); toast("Link copied 📋"); }
-      }}>
-        📤 Share
-      </button>
-      <button className="btn ghost" onClick={shareCard}>🖼 Send me a share card</button>
       {me.support_username && (
         <div className="empty">Need help? Contact @{me.support_username}</div>
       )}
