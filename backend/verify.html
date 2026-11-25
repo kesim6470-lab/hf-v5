@@ -8,14 +8,14 @@
 <title>Security Check</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
-  --bg:#0a1310; --surface:#12211c;
-  --border:rgba(231,181,77,.16); --border-soft:rgba(255,255,255,.06);
-  --gold:#e7b54d; --emerald:#2e9c6d; --terracotta:#d1544a;
-  --ink:#f3eee2; --ink-dim:#a9b6ab; --ink-faint:#5f7268;
+  --bg:#05070f; --surface:rgba(255,255,255,.045);
+  --border:rgba(103,232,249,.22); --border-soft:rgba(255,255,255,.09);
+  --cyan:#22d3ee; --violet:#a78bfa; --ok:#2ee6a8; --err:#fb7185;
+  --ink:#eef4ff; --ink-dim:#a5b4cf; --ink-faint:#64748f;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{
@@ -28,111 +28,127 @@ html,body{
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;
   background:
-    radial-gradient(ellipse 60% 40% at 15% -8%,rgba(46,156,109,.18) 0%,transparent 65%),
-    radial-gradient(ellipse 55% 40% at 105% 100%,rgba(231,181,77,.12) 0%,transparent 65%);
+    radial-gradient(ellipse 70% 45% at 8% -10%,rgba(34,211,238,.28) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 45% at 100% 0%,rgba(167,139,250,.24) 0%,transparent 60%),
+    radial-gradient(ellipse 65% 50% at 50% 115%,rgba(232,121,249,.14) 0%,transparent 65%);
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;opacity:.5;
+  background:
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse 80% 70% at 50% 40%,#000 30%,transparent 75%);
 }
 .card{
   position:relative;z-index:1;
-  width:calc(100% - 32px);max-width:350px;
+  width:calc(100% - 32px);max-width:356px;
   background:var(--surface);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   border:1px solid var(--border-soft);
-  border-radius:22px;
-  padding:32px 20px 26px;
+  border-radius:26px;
+  padding:34px 22px 28px;
   text-align:center;
-  box-shadow:0 22px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.04);
+  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(103,232,249,.06),inset 0 1px 0 rgba(255,255,255,.09);
+}
+.card::before{
+  content:'';position:absolute;top:0;left:24px;right:24px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(103,232,249,.65),rgba(167,139,250,.65),transparent);
 }
 .icon-zone{
-  width:72px;height:72px;margin:0 auto 20px;
+  width:78px;height:78px;margin:0 auto 20px;
   position:relative;display:flex;align-items:center;justify-content:center;
 }
 .icon-bg{
-  position:absolute;inset:0;border-radius:50%;
-  background:rgba(231,181,77,.1);
-  border:1.5px solid rgba(231,181,77,.25);
+  position:absolute;inset:0;border-radius:24px;
+  background:linear-gradient(145deg,rgba(34,211,238,.16),rgba(167,139,250,.16));
+  border:1.5px solid rgba(103,232,249,.35);
+  transform:rotate(45deg);
   transition:background .4s,border-color .4s;
 }
-.icon-zone.state-ok .icon-bg{background:rgba(46,156,109,.12);border-color:rgba(46,156,109,.35);}
-.icon-zone.state-err .icon-bg{background:rgba(209,84,74,.12);border-color:rgba(209,84,74,.35);}
-.icon-zone svg{width:28px;height:28px;position:relative;z-index:1;transition:opacity .2s;}
+.icon-zone.state-ok .icon-bg{background:linear-gradient(145deg,rgba(46,230,168,.18),rgba(34,211,238,.12));border-color:rgba(46,230,168,.45);}
+.icon-zone.state-err .icon-bg{background:linear-gradient(145deg,rgba(251,113,133,.16),rgba(232,121,249,.10));border-color:rgba(251,113,133,.45);}
+.icon-zone svg{width:30px;height:30px;position:relative;z-index:1;transition:opacity .2s;}
 @keyframes rot{to{transform:rotate(360deg)}}
 .spin-ring{
-  position:absolute;inset:-7px;border-radius:50%;
+  position:absolute;inset:-8px;border-radius:50%;
   border:2px solid transparent;
-  border-top-color:var(--gold);
-  border-right-color:rgba(231,181,77,.2);
+  border-top-color:var(--cyan);
+  border-right-color:rgba(167,139,250,.35);
   animation:rot .9s linear infinite;
 }
 .icon-zone.state-ok .spin-ring,
 .icon-zone.state-err .spin-ring{display:none;}
-.title{font-family:'Sora',sans-serif;font-size:1.12rem;font-weight:700;letter-spacing:-.015em;color:var(--ink);margin-bottom:5px;}
-.sub{font-size:.76rem;color:var(--ink-faint);line-height:1.5;margin-bottom:22px;min-height:2.2em;}
-.bar-track{height:3px;background:rgba(255,255,255,.06);border-radius:99px;margin-bottom:18px;overflow:hidden;}
+.title{font-family:'Space Grotesk',sans-serif;font-size:1.28rem;font-weight:700;letter-spacing:.01em;color:var(--ink);margin-bottom:5px;}
+.sub{font-size:.78rem;color:var(--ink-faint);line-height:1.5;margin-bottom:22px;min-height:2.2em;}
+.bar-track{height:5px;background:rgba(255,255,255,.07);border-radius:99px;margin-bottom:18px;overflow:hidden;}
 .bar-fill{
   height:100%;width:0%;border-radius:99px;
-  background:linear-gradient(90deg,#b9852a,#e7b54d);
+  background:linear-gradient(90deg,#0ea5c6,#22d3ee,#a78bfa);
+  box-shadow:0 0 12px rgba(34,211,238,.55);
   transition:width .5s cubic-bezier(.4,0,.2,1);
 }
-.bar-fill.s-ok{background:linear-gradient(90deg,#1f7a56,#2e9c6d);width:100%!important;}
-.bar-fill.s-err{background:linear-gradient(90deg,#8f2f28,#d1544a);width:100%!important;}
-.steps{display:flex;flex-direction:column;gap:6px;margin-bottom:18px;}
+.bar-fill.s-ok{background:linear-gradient(90deg,#0d9668,#2ee6a8);box-shadow:0 0 12px rgba(46,230,168,.5);width:100%!important;}
+.bar-fill.s-err{background:linear-gradient(90deg,#be3455,#fb7185);box-shadow:0 0 12px rgba(251,113,133,.5);width:100%!important;}
+.steps{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;}
 .step{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 12px;
-  background:rgba(255,255,255,.02);
-  border:1px solid rgba(255,255,255,.06);
-  border-radius:12px;text-align:left;
+  display:flex;align-items:center;gap:11px;
+  padding:11px 13px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:15px;text-align:left;
   transition:border-color .3s,background .3s;
 }
-.step.active{border-color:rgba(231,181,77,.35);background:rgba(231,181,77,.05);}
-.step.s-ok  {border-color:rgba(46,156,109,.3); background:rgba(46,156,109,.05);}
-.step.s-err {border-color:rgba(209,84,74,.3); background:rgba(209,84,74,.05);}
+.step.active{border-color:rgba(103,232,249,.45);background:rgba(34,211,238,.06);}
+.step.s-ok  {border-color:rgba(46,230,168,.35); background:rgba(46,230,168,.05);}
+.step.s-err {border-color:rgba(251,113,133,.35); background:rgba(251,113,133,.05);}
 .dot{
-  width:22px;height:22px;flex-shrink:0;border-radius:50%;
-  background:rgba(255,255,255,.07);
+  width:24px;height:24px;flex-shrink:0;border-radius:9px;
+  background:rgba(255,255,255,.08);
   display:flex;align-items:center;justify-content:center;
-  font-family:'Sora',sans-serif;font-size:.6rem;font-weight:700;color:var(--ink-faint);
+  font-family:'Space Grotesk',sans-serif;font-size:.62rem;font-weight:700;color:var(--ink-faint);
   transition:background .3s,color .3s;
 }
-.step.active .dot{background:var(--gold);color:#241a05;}
-.step.s-ok   .dot{background:var(--emerald);color:#fff;}
-.step.s-err  .dot{background:var(--terracotta);color:#fff;}
+.step.active .dot{background:linear-gradient(135deg,#22d3ee,#818cf8);color:#06121f;}
+.step.s-ok   .dot{background:var(--ok);color:#04150d;}
+.step.s-err  .dot{background:var(--err);color:#fff;}
 .step-body{flex:1;min-width:0;}
-.step-name{font-family:'Sora',sans-serif;font-size:.76rem;font-weight:600;color:var(--ink-dim);}
-.step-info{font-size:.67rem;color:var(--ink-faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.step.active .step-info{color:#c9a15c;}
-.step.s-ok   .step-info{color:#6fcf9e;}
-.step.s-err  .step-info{color:#e8837a;}
+.step-name{font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:600;color:var(--ink-dim);letter-spacing:.01em;}
+.step-info{font-size:.68rem;color:var(--ink-faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.step.active .step-info{color:#7dd3fc;}
+.step.s-ok   .step-info{color:#5eead4;}
+.step.s-err  .step-info{color:#fda4af;}
 @keyframes sp{to{transform:rotate(360deg)}}
 .sp{
   width:12px;height:12px;flex-shrink:0;border-radius:50%;
-  border:2px solid rgba(231,181,77,.15);
-  border-top-color:var(--gold);
+  border:2px solid rgba(103,232,249,.18);
+  border-top-color:var(--cyan);
   animation:sp .7s linear infinite;
   display:none;
 }
 .step.active .sp{display:block;}
 .pill{
-  display:none;padding:12px 14px;border-radius:11px;
+  display:none;padding:12px 14px;border-radius:13px;
   font-size:.78rem;font-weight:500;line-height:1.6;text-align:left;
 }
 .pill strong{font-weight:700;}
-.pill.s-ok {display:block;background:rgba(46,156,109,.08);color:#6fcf9e;border:1px solid rgba(46,156,109,.2);}
-.pill.s-err{display:block;background:rgba(209,84,74,.08);color:#e8837a;border:1px solid rgba(209,84,74,.2);}
-@keyframes pulse-ok{0%,100%{box-shadow:0 0 0 0 rgba(46,156,109,.25)}50%{box-shadow:0 0 0 9px rgba(46,156,109,0)}}
+.pill.s-ok {display:block;background:rgba(46,230,168,.09);color:#5eead4;border:1px solid rgba(46,230,168,.25);}
+.pill.s-err{display:block;background:rgba(251,113,133,.09);color:#fda4af;border:1px solid rgba(251,113,133,.25);}
+@keyframes pulse-ok{0%,100%{box-shadow:0 0 0 0 rgba(46,230,168,.28)}50%{box-shadow:0 0 0 10px rgba(46,230,168,0)}}
 .icon-zone.state-ok .icon-bg{animation:pulse-ok 2s ease infinite;}
 .retry-btn{
-  display:none;width:100%;margin-top:14px;padding:12px;
-  border:none;border-radius:11px;cursor:pointer;
-  background:linear-gradient(135deg,#1f7a56,#2e9c6d);
-  color:#fff;font-size:.85rem;font-weight:700;
-  font-family:'Sora',sans-serif;
+  display:none;width:100%;margin-top:14px;padding:13px;
+  border:none;border-radius:13px;cursor:pointer;
+  background:linear-gradient(135deg,#0d9668,#2ee6a8);
+  color:#04150d;font-size:.86rem;font-weight:700;
+  font-family:'Space Grotesk',sans-serif;
 }
 .retry-btn.show{display:block;}
 .tg-btn{
-  display:none;width:100%;margin-top:10px;padding:12px;
-  border:none;border-radius:11px;cursor:pointer;text-decoration:none;
-  background:linear-gradient(135deg,#2AABEE,#229ED9);
-  color:#fff;font-size:.85rem;font-weight:700;font-family:'Sora',sans-serif;
+  display:none;width:100%;margin-top:10px;padding:13px;
+  border:none;border-radius:13px;cursor:pointer;text-decoration:none;
+  background:linear-gradient(135deg,#38bdf8,#818cf8);
+  color:#fff;font-size:.86rem;font-weight:700;font-family:'Space Grotesk',sans-serif;
   text-align:center;box-sizing:border-box;
 }
 .tg-btn.show{display:block;}
@@ -143,14 +159,14 @@ body::before{
   <div class="icon-zone" id="iconZone">
     <div class="spin-ring"></div>
     <div class="icon-bg"></div>
-    <svg id="iShield" viewBox="0 0 24 24" fill="none" stroke="#e7b54d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <svg id="iShield" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
       <polyline points="9 12 11 14 15 10"/>
     </svg>
-    <svg id="iCheck" viewBox="0 0 24 24" fill="none" stroke="#2e9c6d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+    <svg id="iCheck" viewBox="0 0 24 24" fill="none" stroke="#2ee6a8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
       <circle cx="12" cy="12" r="10"/><polyline points="7 12 10.5 15.5 17 9"/>
     </svg>
-    <svg id="iX" viewBox="0 0 24 24" fill="none" stroke="#d1544a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+    <svg id="iX" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
       <circle cx="12" cy="12" r="10"/>
       <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
     </svg>
@@ -407,7 +423,7 @@ async function getFingerprint(){
     ctx.fillRect(0, 0, 240, 60);
     ctx.fillStyle = "rgba(102,204,0,.7)";
     ctx.font      = "15px 'Arial'";
-    ctx.fillText("Squad4xx🔐verify", 4, 20);
+    ctx.fillText("AnonEarn🔐verify", 4, 20);
     canvasRaw = c.toDataURL();
   } catch {}
   const canvasHash = canvasRaw ? await sha256(canvasRaw) : "canvas_err";

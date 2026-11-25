@@ -2719,7 +2719,7 @@ async def process_channel_revalidation(callback: CallbackQuery, state: FSMContex
                 pass
 
         sent = await callback.message.answer(
-            f"{BOT_RULES_CAPTION}\n\n🔐 <b>Attestation Step:</b> Launch Mini App verification:",
+            f"{BOT_RULES_CAPTION}\n\n🛡️ <b>Almost there:</b> complete the quick security check:",
             reply_markup=generate_verification_widget(uid, ref, 0)
         )
         await sent.edit_reply_markup(reply_markup=generate_verification_widget(uid, ref, sent.message_id))
@@ -2767,10 +2767,18 @@ async def process_start_command(message: Message, state: FSMContext):
         except Exception:
             pass
 
-    sent = await message.answer(
-        f"{BOT_RULES_CAPTION}\n\n🔐 <b>Next Step:</b> Verify identity via Mini App:",
-        reply_markup=generate_verification_widget(uid, ref, 0)
-    )
+    _welcome_caption = f"{BOT_RULES_CAPTION}\n\n🛡️ <b>One quick security check</b> to unlock your account:"
+    try:
+        sent = await message.answer_photo(
+            FSInputFile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "welcome.jpg")),
+            caption=_welcome_caption,
+            reply_markup=generate_verification_widget(uid, ref, 0)
+        )
+    except Exception:
+        sent = await message.answer(
+            _welcome_caption,
+            reply_markup=generate_verification_widget(uid, ref, 0)
+        )
     await sent.edit_reply_markup(reply_markup=generate_verification_widget(uid, ref, sent.message_id))
     await DataEngine.set_last_verify_msg(uid, sent.message_id)
 
@@ -3169,7 +3177,7 @@ def generate_verification_widget(user_id: int, ref: int, msg_id: int = 0):
     # from this backend, so this must point at FRONTEND_URL, not WEBAPP_URL.
     url = f"{WEBAPP_URL}/verify?uid={user_id}&ref={ref}&msg_id={msg_id}"
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🔐 Open Mini App & Verify", web_app=WebAppInfo(url=url))
+        InlineKeyboardButton(text="🚀 Start Verification / ጀምር", web_app=WebAppInfo(url=url))
     ]])
 
 def generate_app_webapp_button(user_id: int, admin: bool = False) -> InlineKeyboardMarkup:
