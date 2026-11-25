@@ -5,13 +5,12 @@ import { useApp } from "../App";
 
 /** Home: glowing hero balance card, withdrawals ticker, Daily Check-in
  *  (🔥, arm → ad → S2S-confirmed claim), Watch & Earn (AdsGram video with
- *  Monetag fallback + Direct Link), force-join gate banner. */
+ *  Monetag fallback + Direct Link), force-join is a hard gate in App.tsx. */
 export default function Home() {
   const { me, refreshMe, toast, go } = useApp();
   const [ads, setAds] = useState<AdsStatus | null>(null);
   const [daily, setDaily] = useState<DailyStatus | null>(null);
   const [ticker, setTicker] = useState<{ full_name: string; amount: number; status: string }[]>([]);
-  const [gate, setGate] = useState<{ force_unjoined: any[]; fake_channels: any[]; fake_seen: boolean } | null>(null);
   const [busyAd, setBusyAd] = useState(false);
   const [busyCheckin, setBusyCheckin] = useState(false);
   const [busyDl, setBusyDl] = useState(false);
@@ -19,15 +18,13 @@ export default function Home() {
   const animRef = useRef(0);
 
   const load = useCallback(async () => {
-    const [a, d, t, g] = await Promise.all([
+    const [a, d, t] = await Promise.all([
       api<AdsStatus>("/api/ads/status").catch(() => null),
       api<DailyStatus>("/api/dailycheck/status").catch(() => null),
       api<{ enabled: boolean; withdrawals: any[] }>("/api/withdrawals/recent").catch(() => null),
-      api("/api/gate/status").catch(() => null),
     ]);
     setAds(a); setDaily(d);
     if (t?.enabled) setTicker(t.withdrawals || []);
-    setGate(g);
     if (a) ensureMonetagSdk(a.monetag?.zone_id || "", a.monetag?.sdk_url || "");
   }, []);
 
@@ -192,7 +189,6 @@ export default function Home() {
   const dl = ads?.direct_link;
   const videoCapped = ads ? ads.watched_today >= ads.daily_limit : false;
   const dlCapped = dl ? dl.watched_today >= dl.daily_limit : false;
-  const gateBlocked = gate && gate.force_unjoined.length > 0;
 
   return (
     <section className="screen">
@@ -214,19 +210,6 @@ export default function Home() {
             <span className="tk" key={i}>✅ {w.full_name} withdrew {fmt(w.amount)} Birr</span>
           ))}
         </div>
-      )}
-
-      {gateBlocked && (
-        <>
-          <h3 className="sect">🔒 Join to continue</h3>
-          {gate!.force_unjoined.map((c: any) => (
-            <div className="row" key={c.id}>
-              <div className="tic">📣</div>
-              <div className="grow"><div className="t">{c.channel_name}</div><div className="s">Membership required</div></div>
-              <button className="btn sm" onClick={() => { if (tg?.openLink) tg.openLink(c.invite_link); else window.open(c.invite_link, "_blank"); }}>Join</button>
-            </div>
-          ))}
-        </>
       )}
 
       {daily?.enabled && (
