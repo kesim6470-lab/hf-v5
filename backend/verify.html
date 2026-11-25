@@ -86,12 +86,12 @@ body::after{
   height:100%;width:0%;border-radius:99px;position:relative;overflow:hidden;
   background:linear-gradient(90deg,#0ea5c6,#22d3ee,#a78bfa);
   box-shadow:0 0 14px rgba(34,211,238,.6);
-  transition:width .5s cubic-bezier(.4,0,.2,1);
+  transition:width .35s cubic-bezier(.4,0,.2,1);
 }
 .bar-fill::after{
   content:'';position:absolute;inset:0;
   background:linear-gradient(105deg,transparent 20%,rgba(255,255,255,.55) 50%,transparent 80%);
-  animation:sweep 1.15s linear infinite;
+  animation:sweep .9s linear infinite;
 }
 @keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 .bar-fill.s-ok{background:linear-gradient(90deg,#0d9668,#2ee6a8);box-shadow:0 0 12px rgba(46,230,168,.5);width:100%!important;}
@@ -540,7 +540,7 @@ async function submit(fpData){
     if (result.status === "verified" || result.status === "already_verified") {
       ok(3, "Passed ✓");
       showOK();
-      goToApp(1200);
+      goToApp(600);
     } else if (result.status === "blocked") {
       err(3, "Rejected ✕");
       /*

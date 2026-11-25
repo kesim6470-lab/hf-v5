@@ -2596,7 +2596,6 @@ def invite_share_text(link: str) -> str:
     gold-coin brand line, earn-loop lines, payout line, link last."""
     return (
         "🪙 ANON EARN — Birr, little by little, every day.\n\n"
-        "No deposit. No investment. I earn here from my phone:\n"
         "🎬 clips I watch turn into Birr\n"
         "🎯 small missions, quick rewards\n"
         "🔥 a daily streak that keeps paying\n"
@@ -2612,7 +2611,6 @@ def invite_card_caption() -> str:
     caption + Join button) sent via the inline picker / share_card."""
     return (
         "🪙 <b>ANON EARN — Birr, little by little, every day.</b>\n\n"
-        "No deposit. No investment. I earn here from my phone:\n"
         "🎬 clips I watch turn into Birr\n"
         "🎯 small missions, quick rewards\n"
         "🔥 a daily streak that keeps paying\n"
