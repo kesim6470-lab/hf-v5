@@ -63,8 +63,7 @@ export default function Withdraw() {
       <h3 className="sect">💸 Withdraw</h3>
       <div className="card">
         <div style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600 }}>
-          Balance: <b style={{ color: "var(--accent)" }}>{fmt(me.balance)} Birr</b> · Min {fmt(me.min_withdrawal)} Birr ·
-          Processing: {me.withdrawal_process_time}
+          Balance: <b style={{ color: "var(--accent)" }}>{fmt(me.balance)} Birr</b> · Min {fmt(me.min_withdrawal)} Birr
         </div>
         <div className="seg">
           <button className={method === "telebirr" ? "active" : ""} onClick={() => setMethod("telebirr")}>📲 Telebirr</button>
