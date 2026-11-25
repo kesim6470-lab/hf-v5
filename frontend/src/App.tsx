@@ -24,6 +24,7 @@ export default function App() {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     try { return (localStorage.getItem("hf-theme") as "dark" | "light") || "dark"; } catch { return "dark"; }
   });
+  const [booted, setBooted] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -48,7 +49,7 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => { refreshMe(); }, [refreshMe]);
+  useEffect(() => { refreshMe().finally(() => setBooted(true)); }, [refreshMe]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -65,6 +66,17 @@ export default function App() {
     { id: "withdraw", icon: "💸", label: "Withdraw", show: true },
     { id: "admin", icon: "⚙️", label: "Admin", show: !!me?.is_admin },
   ];
+
+  if (!booted) {
+    return (
+      <div className="splash">
+        <img className="splash-logo" src="/logo.png" alt="Anon Earn" />
+        <div className="splash-name">Anon Earn</div>
+        <div className="splash-bar"><div className="splash-fill" /></div>
+        <div className="splash-sub">Loading your account… / በመጫን ላይ…</div>
+      </div>
+    );
+  }
 
   return (
     <Ctx.Provider value={{ me, refreshMe, toast, go }}>

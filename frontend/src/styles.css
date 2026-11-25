@@ -109,3 +109,13 @@ nav button.active .ni{filter:none}
 .seg button.active{background:var(--grad);color:var(--on-accent);border-color:transparent}
 .spin-ico{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp 0.7s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---- boot splash: shown while the first /api/me load is in flight ---- */
+.splash{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.splash-logo{width:92px;height:92px;border-radius:50%;box-shadow:0 10px 34px rgba(34,211,238,.35);animation:splashPulse 1.6s ease-in-out infinite}
+@keyframes splashPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.splash-name{font-size:24px;font-weight:800;letter-spacing:.02em}
+.splash-bar{width:180px;height:5px;border-radius:99px;background:rgba(255,255,255,.10);overflow:hidden}
+.splash-fill{height:100%;width:40%;border-radius:99px;background:linear-gradient(90deg,#22d3ee,#a78bfa);animation:splashSlide 1.1s ease-in-out infinite}
+@keyframes splashSlide{0%{transform:translateX(-110%)}100%{transform:translateX(480%)}}
+.splash-sub{font-size:13px;color:var(--muted)}
