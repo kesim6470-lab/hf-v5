@@ -5022,6 +5022,23 @@ class ApiBase(BaseModel):
     initData: str = ""
 
 
+
+async def _require_force_joined(uid: int):
+    """Hard force-join gate for earning / payout endpoints (owner order
+    2026-11-26: users who have not joined every required channel must
+    NOT be let through — the Mini App shows them a join screen, and
+    these endpoints refuse with 403 'join_required' so the gate cannot
+    be bypassed by calling the API directly). Admins are exempt.
+    inspect_compulsory_memberships already fails OPEN when the bot
+    cannot check a channel (bot not admin / bad id), so a misconfigured
+    channel can never lock everyone out through this path either."""
+    if evaluate_admin_access(uid):
+        return
+    unjoined = await inspect_compulsory_memberships(uid)
+    if unjoined:
+        raise HTTPException(status_code=403, detail="join_required")
+
+
 async def _authenticate(body: ApiBase) -> dict:
     """Validates Telegram WebApp initData and returns the users-table row
     as a plain dict. Raises 403 'not_verified' if this user has never
@@ -5659,6 +5676,7 @@ async def api_dailycheck_claim(body: ApiBase):
     uid = user["user_id"]
 
     enabled = (await DataEngine.get_setting("daily_checkin_enabled", "1")) == "1"
+    await _require_force_joined(uid)
     if not enabled:
         raise HTTPException(status_code=400, detail="disabled")
 
@@ -5685,6 +5703,7 @@ async def api_ads_claim(body: ApiBase):
     uid = user["user_id"]
 
     ads_enabled = (await DataEngine.get_setting("ads_enabled", "0")) == "1"
+    await _require_force_joined(uid)
     block_id = (await DataEngine.get_setting("adsgram_block_id", "") or "").strip()
     monetag_zone_id = (await DataEngine.get_setting("monetag_zone_id", "") or "").strip()
     if not ads_enabled or not (block_id or monetag_zone_id):
@@ -5990,6 +6009,7 @@ class AdDirectLinkClaimRequest(ApiBase):
 async def api_ads_direct_link_claim(body: AdDirectLinkClaimRequest):
     user = await _authenticate(body)
     uid = user["user_id"]
+    await _require_force_joined(uid)
 
     wait_seconds  = int(await DataEngine.get_setting("direct_link_wait_seconds", "15"))
     reward_amount = float(await DataEngine.get_setting("direct_link_reward_amount", "0.3"))
@@ -6144,6 +6164,7 @@ async def api_tasks_join(body: TaskActionRequest):
     task = await DataEngine.get_task(body.task_id)
     if not task or not task["is_active"]:
         raise HTTPException(status_code=404, detail="task_not_found")
+    await _require_force_joined(user["user_id"])
     await DataEngine.mark_task_joined(user["user_id"], body.task_id)
     return {"wait_seconds": TASK_JOIN_WAIT_SECONDS}
 
@@ -6184,6 +6205,7 @@ async def api_tasks_check(body: TaskActionRequest):
 async def api_tasks_claim(body: TaskActionRequest):
     user = await _authenticate(body)
     uid = user["user_id"]
+    await _require_force_joined(uid)
     task = await DataEngine.get_task(body.task_id)
     if not task:
         raise HTTPException(status_code=404, detail="task_not_found")
@@ -6449,6 +6471,7 @@ class WithdrawRequest(ApiBase):
 @api_app.post("/api/withdraw")
 async def api_withdraw(body: WithdrawRequest):
     user = await _authenticate(body)
+    await _require_force_joined(user["user_id"])
     min_w = float(await DataEngine.get_setting("min_withdrawal", "50"))
     if body.amount < min_w:
         raise HTTPException(status_code=400, detail=f"min_withdrawal_is_{min_w:.2f}")
