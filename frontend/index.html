@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Anon Earn — Mini App</title>
+<link rel="preconnect" href="https://hf-v5-production.up.railway.app">
+<link rel="preload" as="image" href="/logo.png">
 <!-- Telegram WebApp SDK: the plain script route (simpler + more reliable
      than a wrapper package — same approach as the legacy frontend). -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -14,9 +16,31 @@
      of the legacy app (BACKEND_URL there). */
   window.APP_CONFIG = { API_BASE: "https://hf-v5-production.up.railway.app" };
 </script>
+<style>
+  /* Pre-React splash: identical to the app's own boot splash, painted by
+     the browser the instant the HTML arrives (before the JS bundle even
+     downloads), so entering the Mini App has no blank/flash frame. React
+     replaces it with the real splash, which looks the same. */
+  body{margin:0;background:#070a12;font-family:-apple-system,"Segoe UI",Roboto,Inter,sans-serif}
+  .pre-splash{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;color:#f7fbee}
+  .pre-splash img{width:92px;height:92px;border-radius:50%;box-shadow:0 10px 34px rgba(34,211,238,.35);animation:prePulse 1.15s ease-in-out infinite;will-change:transform}
+  @keyframes prePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  .pre-splash .n{font-size:24px;font-weight:800;letter-spacing:.02em}
+  .pre-splash .bar{width:180px;height:5px;border-radius:99px;background:rgba(255,255,255,.10);overflow:hidden}
+  .pre-splash .fill{height:100%;width:40%;border-radius:99px;background:linear-gradient(90deg,#22d3ee,#a78bfa);animation:preSlide .85s cubic-bezier(.45,.05,.55,.95) infinite;will-change:transform}
+  @keyframes preSlide{0%{transform:translateX(-110%)}100%{transform:translateX(480%)}}
+  .pre-splash .s{font-size:13px;color:#a7b3a0}
+</style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root">
+  <div class="pre-splash">
+    <img src="/logo.png" alt="Anon Earn">
+    <div class="n">Anon Earn</div>
+    <div class="bar"><div class="fill"></div></div>
+    <div class="s">Loading your account…</div>
+  </div>
+</div>
 <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
