@@ -294,7 +294,7 @@ function showErr(reason, allowRetry, detail){
    */
   const SELF_REASONS  = new Set(["self_invite", "same_device_as_referrer"]);
   const MULTI_REASONS = new Set([
-    "correlated_clone", "ip_farm", "banned_ip"
+    "correlated_clone", "ip_farm", "banned_ip", "blocked"
   ]);
 
   let category;
@@ -356,7 +356,14 @@ function showErr(reason, allowRetry, detail){
   // Technical detail (Railway/CORS/config hints) stays in the console log
   // for admins — normal users only ever see the friendly message above.
   if (detail) console.warn("[verify][detail]", detail);
-  $pill.innerHTML = m.b + (DEBUG && detail ? `<br><span style="opacity:.55;font-size:.72em">debug: ${detail}</span>` : "");
+  $pill.innerHTML = m.b;
+  if (DEBUG && detail) {
+    const dbg = document.createElement("span");
+    dbg.style.cssText = "opacity:.55;font-size:.72em";
+    dbg.textContent = "debug: " + detail;
+    $pill.appendChild(document.createElement("br"));
+    $pill.appendChild(dbg);
+  }
   tg?.HapticFeedback?.notificationOccurred("error");
 
   if (category === "not_telegram") {
@@ -372,7 +379,10 @@ function showErr(reason, allowRetry, detail){
 function closeApp(ms){ setTimeout(() => tg?.close(), ms); }
 function goToApp(ms){
   setTimeout(() => {
-    location.href = "https://hf-v5-frontend-production.up.railway.app";
+    // Carry Telegram's launch data (#tgWebAppData=...) across to the
+    // app — without it the app boots with empty initData and shows the
+    // "Open in Telegram" screen instead of the dashboard.
+    location.href = "https://hf-v5-frontend-production.up.railway.app" + (location.hash || "");
   }, ms);
 }
 

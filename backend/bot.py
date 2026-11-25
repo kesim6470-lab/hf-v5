@@ -17,6 +17,8 @@ import random
 import secrets
 import asyncio
 import re
+import math
+import ipaddress
 import hashlib
 import logging
 import urllib.parse
@@ -51,6 +53,7 @@ from typing import Optional, List
 
 load_dotenv()
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -145,6 +148,7 @@ class RateLimiter:
             return True
 
 verify_limiter = RateLimiter(max_calls=6, window_seconds=60)
+tasks_check_limiter = RateLimiter(max_calls=30, window_seconds=60)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # IP COOLDOWN — አንድ IP verify ካደረገ በኋላ 3 ደቂቃ ሌላ NEW verify እንዳይሞክር
@@ -471,6 +475,7 @@ MIGRATION_STATEMENTS = [
         reviewed_at  TEXT
     )""",
     "CREATE INDEX IF NOT EXISTS idx_manual_submissions_status    ON manual_submissions(status)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_manual_one_pending ON manual_submissions(user_id, task_id) WHERE status='pending'",
     "CREATE INDEX IF NOT EXISTS idx_manual_submissions_user_task ON manual_submissions(user_id, task_id)",
     """CREATE TABLE IF NOT EXISTS fraud_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -597,6 +602,9 @@ class DataEngine:
 
     @staticmethod
     async def add_balance(user_id: int, amount: float):
+        if not math.isfinite(amount):
+            logger.warning(f"add_balance refused non-finite amount for {user_id}: {amount}")
+            return
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
                 "UPDATE users SET balance = ROUND(balance + ?, 2) WHERE user_id = ?", (amount, user_id)
@@ -868,6 +876,30 @@ class DataEngine:
             return (await cur.fetchone())[0] or 0
 
     @staticmethod
+    async def has_prior_hard_block(user_id: int) -> bool:
+        """True if this uid was hard-blocked at verification before
+        (self-invite or IP farm — the two unambiguous reasons) within
+        the last 30 days."""
+        async with aiosqlite.connect(DB_PATH) as db:
+            cur = await db.execute(
+                "SELECT COUNT(*) FROM fraud_log WHERE user_id=? "
+                "AND reason IN ('self_invite', 'ip_farm') "
+                "AND logged_at >= datetime('now', '-30 days')",
+                (user_id,),
+            )
+            row = await cur.fetchone()
+            return bool(row and row[0] > 0)
+
+    @staticmethod
+    async def set_referred_by_if_empty(user_id: int, referrer_id: int):
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "UPDATE users SET referred_by=? WHERE user_id=? AND (referred_by IS NULL OR referred_by=0)",
+                (referrer_id, user_id),
+            )
+            await db.commit()
+
+    @staticmethod
     async def count_ip_distinct_fingerprints(ip: str) -> int:
         """
         How many DIFFERENT device fingerprints have verified on this IP.
@@ -899,6 +931,9 @@ class DataEngine:
         user_id: int, amount: float, full_name: str, phone: str,
         method: str = "telebirr", binance_uid: str = ""
     ) -> tuple[int, bool]:
+        # M1: NaN/Infinity bind as NULL in SQLite and corrupt the ledger.
+        if not math.isfinite(amount) or amount <= 0:
+            return 0, False
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("BEGIN EXCLUSIVE")
             try:
@@ -1100,7 +1135,7 @@ class DataEngine:
     async def count_total_completed_ads(user_id: int) -> int:
         async with aiosqlite.connect(DB_PATH) as db:
             cur = await db.execute(
-                "SELECT COUNT(*) FROM ad_events WHERE user_id=? AND status IN ('completed', 'completed_checkin')",
+                "SELECT COUNT(*) FROM ad_events WHERE user_id=? AND kind='video' AND status IN ('completed', 'completed_checkin')",
                 (user_id,),
             )
             row = await cur.fetchone()
@@ -1543,7 +1578,25 @@ class DataEngine:
         return False, "waiting_tads"
 
     @staticmethod
-    async def record_tads_result(user_id: int, status: str, within_seconds: int = 300) -> bool:
+    async def record_tads_result(user_id: int, status: str, within_seconds: int = 300, source: str = "client") -> bool:
+        # H4: 'completed' is accepted ONLY from the Tads S2S webhook
+        # (source='webhook'). A client claim of completion proves
+        # nothing — the old code let any user finalize the payout by
+        # POSTing result='completed' without a Tads view ever happening.
+        if source == "client" and status == "completed":
+            return False
+        if source == "client" and status == "no_fill":
+            # Client no_fill is kept for genuine no-inventory cases but
+            # capped per day and logged, so it can't be scripted as a
+            # permanent bypass of the second ad.
+            async with aiosqlite.connect(DB_PATH) as db:
+                cur = await db.execute(
+                    "SELECT COUNT(*) FROM fraud_log WHERE user_id=? AND reason='tads_client_nofill' "
+                    "AND date(logged_at) = date('now')", (user_id,))
+                row = await cur.fetchone()
+                if row and row[0] >= 5:
+                    return False
+            await DataEngine.log_fraud_attempt(user_id, "tads_client_nofill", "", "client-reported no_fill accepted (daily cap 5)")
         """Records the client-reported Tads outcome ('completed' or
         'no_fill'). If AdsGram's own S2S confirmation already arrived and
         is still fresh, finishes the payout right now (the counterpart to
@@ -1852,7 +1905,8 @@ class DataEngine:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
                 "UPDATE tasks SET slots_used = slots_used + 1 WHERE id = ? "
-                "AND budget_slots > 0 AND slots_used < budget_slots", (task_id,))
+                "AND budget_slots > 0 AND slots_used < budget_slots "
+                "AND is_active = 1 AND review_status = 'approved'", (task_id,))
             if cur.rowcount == 0:
                 await db.commit()
                 return False, True
@@ -1929,7 +1983,7 @@ class DataEngine:
                 unused_slots = max(0, int(budget_slots) - int(slots_used))
                 refund = round(unused_slots * float(reward), 2)
                 await db.execute(
-                    "UPDATE tasks SET is_active=0, review_status='cancelled' WHERE id=?",
+                    "UPDATE tasks SET is_active=0, review_status='cancelled', budget_slots=slots_used WHERE id=?",
                     (task_id,),
                 )
                 if refund > 0:
@@ -2289,7 +2343,11 @@ async def evaluate_clone_risk(
 
     ip_ok = bool(client_ip) and client_ip not in ("127.0.0.1", "::1", "unknown")
     fp_ok = bool(fingerprint) and fingerprint not in ("undefined", "null", "")
-    hw_ok = bool(canvas_hash) and len(canvas_hash) > 8 and bool(webgl_hash) and len(webgl_hash) > 8
+    _sentinel = ("canvas_err", "webgl_err")
+    hw_ok = (
+        bool(canvas_hash) and len(canvas_hash) > 8 and canvas_hash not in _sentinel and not canvas_hash.startswith("sha_err")
+        and bool(webgl_hash) and len(webgl_hash) > 8 and webgl_hash not in _sentinel and not webgl_hash.startswith("sha_err")
+    )
     tg_ok = bool(tg_platform) and bool(tg_version)
 
     # ── 2. Correlate against every candidate that shares ≥1 signal ────────
@@ -2457,7 +2515,22 @@ def extract_real_ip(request: Request) -> str:
             if parts:
                 return parts[0]
     if request.client:
-        return request.client.host
+        peer = request.client.host
+        try:
+            peer_ip = ipaddress.ip_address(peer)
+        except ValueError:
+            peer_ip = None
+        if peer_ip is not None and (peer_ip.is_private or peer_ip.is_loopback):
+            # M6: the direct peer is a platform edge proxy (Railway) —
+            # its address is internal, so the real client IP is the LAST
+            # X-Forwarded-For entry, the one the edge itself appended.
+            # A public direct peer never reaches this branch, so header
+            # spoofing stays impossible (BUG-REPORT #2 stays fixed).
+            forwarded = request.headers.get("X-Forwarded-For", "")
+            parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+            if parts:
+                return parts[-1]
+        return peer
     return "unknown"
 
 
@@ -2903,7 +2976,7 @@ def parse_telegram_webapp_handshake(init_data: str) -> dict | None:
         except ValueError:
             return None
         age = time.time() - auth_date
-        if age < 0 or age > MAX_INIT_DATA_AGE_SECONDS:
+        if age < -60 or age > MAX_INIT_DATA_AGE_SECONDS:
             return None
 
         return json.loads(parsed.get("user", "{}"))
@@ -3359,7 +3432,7 @@ async def process_cashout_volume(message: Message, state: FSMContext):
     s = await state.get_data()
     try:
         val = round(float(message.text.strip()), 2)
-        if val < s["cached_minimum"] or val > s["cached_balance"]:
+        if not math.isfinite(val) or val < s["cached_minimum"] or val > s["cached_balance"]:
             return await message.answer(
                 f"❌ That amount doesn't work. The minimum is {s['cached_minimum']:.2f} Birr.\n"
                 f"Your balance: <b>{s['cached_balance']:.2f} Birr</b>."
@@ -5136,6 +5209,12 @@ async def api_verify(body: VerifyRequest, request: Request):
 
     flagged_username = tg_user.get("username", "") or ""
 
+    if multi_detect_on and await DataEngine.has_prior_hard_block(uid):
+        # M3: a previous hard fraud decision (self-invite / IP farm)
+        # sticks — retries get the same generic answer instead of a
+        # fresh oracle reading on tweaked fingerprints.
+        return {"status": "blocked", "reason": "blocked"}
+
     if await DataEngine.is_ip_banned(client_ip):
         await DataEngine.log_fraud_attempt(
             uid, "banned_ip_attempt", client_ip,
@@ -5161,7 +5240,10 @@ async def api_verify(body: VerifyRequest, request: Request):
         await DataEngine.log_fraud_attempt(uid, reason, client_ip, detail)
         if reason == "ip_farm":
             await DataEngine.ban_ip(client_ip, reason)
-        return {"status": "blocked", "reason": reason}
+        # M3: never hand the attacker the exact fraud reason — it turns
+        # this endpoint into an oracle for tuning bypasses. The real
+        # reason is in the fraud log for the admin.
+        return {"status": "blocked", "reason": "blocked"}
 
     # Passed every check — atomically claim the verification slot FIRST.
     # This is the actual guard against double-paying a referral: if a
@@ -5188,6 +5270,11 @@ async def api_verify(body: VerifyRequest, request: Request):
     referred_by = ref if referrer_row else None
 
     existing = await DataEngine.get_user(uid)
+    if existing and referred_by:
+        # M2: rows created early by the self-heal paths have no
+        # referrer recorded — attribute this referral properly instead
+        # of paying out against a NULL referred_by.
+        await DataEngine.set_referred_by_if_empty(uid, referred_by)
     if not existing:
         full_name = (
             f"{tg_user.get('first_name', '')} {tg_user.get('last_name', '')}".strip()
@@ -5204,6 +5291,8 @@ async def api_verify(body: VerifyRequest, request: Request):
         # direct_count already includes the referral we just created above,
         # so it IS this referral's 1-indexed position for this referrer.
         skipped = await DataEngine.is_referral_skipped(referred_by, direct_count)
+        if not skipped and referrer_row and referrer_row["is_banned"]:
+            skipped = True  # M2: a banned referrer is never credited
         if not skipped:
             rate = float(await DataEngine.get_setting("reward_per_referral", "10"))
             await DataEngine.add_balance(referred_by, rate)
@@ -5641,7 +5730,7 @@ async def api_ads_adsgram_reward(userid: int, secret: Optional[str] = None,
     correct secret this endpoint always refuses, so nobody can fabricate
     free ad-reward calls by guessing the URL shape."""
     required_secret = await get_adsgram_s2s_secret()
-    if not secret or not hmac.compare_digest(secret, required_secret):
+    if not secret or not hmac.compare_digest(str(secret).encode(), str(required_secret).encode()):
         return {"ok": False, "reason": "unauthorized"}
 
     user = await DataEngine.get_user(userid)
@@ -5775,6 +5864,10 @@ async def api_ads_tads_result(body: AdTadsResultRequest):
     user = await _authenticate(body)
     uid = user["user_id"]
     result = body.result if body.result in ("completed", "no_fill") else "failed"
+    if result == "completed":
+        # H4: client-reported completion is not proof of a Tads view —
+        # only the S2S webhook may finalize with 'completed'.
+        return {"ok": True, "finalized": False}
     if result == "failed":
         await DataEngine.clear_ad_reward_gate(uid)
         return {"ok": True, "finalized": False}
@@ -5803,7 +5896,7 @@ async def _handle_tads_webhook(request: Request):
 
     required_secret = await get_tads_webhook_secret()
     secret = params.get("secret")
-    if not secret or not hmac.compare_digest(str(secret), required_secret):
+    if not secret or not hmac.compare_digest(str(secret).encode(), str(required_secret).encode()):
         return {"ok": False, "reason": "unauthorized"}
 
     telegram_id_raw = params.get("telegram_id")
@@ -5823,7 +5916,7 @@ async def _handle_tads_webhook(request: Request):
     if not user or user["is_banned"]:
         return {"ok": False, "reason": "unknown_user"}
 
-    finalized = await DataEngine.record_tads_result(telegram_id, "completed")
+    finalized = await DataEngine.record_tads_result(telegram_id, "completed", source="webhook")
     return {"ok": True, "finalized": finalized}
 
 
@@ -6043,6 +6136,8 @@ async def api_tasks_join(body: TaskActionRequest):
 async def api_tasks_check(body: TaskActionRequest):
     user = await _authenticate(body)
     uid = user["user_id"]
+    if not await tasks_check_limiter.is_allowed(f"check:{uid}"):
+        raise HTTPException(status_code=429, detail="too_many_attempts")
     task = await DataEngine.get_task(body.task_id)
     if not task:
         raise HTTPException(status_code=404, detail="task_not_found")
@@ -6141,6 +6236,8 @@ class ManualSubmitRequest(ApiBase):
 
 @api_app.post("/api/tasks/manual/submit")
 async def api_tasks_manual_submit(body: ManualSubmitRequest):
+    if sum(len(s) for s in body.screenshots) > 6_000_000:
+        raise HTTPException(status_code=400, detail="screenshots_too_large")
     user = await _authenticate(body)
     uid = user["user_id"]
     task = await DataEngine.get_task(body.task_id)
@@ -6167,7 +6264,12 @@ async def api_tasks_manual_submit(body: ManualSubmitRequest):
         except Exception:
             raise HTTPException(status_code=400, detail="invalid_screenshot")
 
-    submission_id = await DataEngine.create_manual_submission(uid, body.task_id, [])
+    try:
+        submission_id = await DataEngine.create_manual_submission(uid, body.task_id, [])
+    except Exception:
+        # M8: the partial unique index fired — a concurrent duplicate
+        # submit lost the race. Report it the same as the pre-check.
+        raise HTTPException(status_code=400, detail="already_submitted")
     file_ids = await notify_admins_manual_submission(submission_id, task, user, image_bytes)
     if file_ids:
         await DataEngine.set_manual_submission_screenshots(submission_id, file_ids)
@@ -6193,7 +6295,9 @@ class VerifyAdminRequest(ApiBase):
 
 @api_app.post("/api/tasks/verify_admin")
 async def api_tasks_verify_admin(body: VerifyAdminRequest):
-    await _authenticate(body)
+    _va_user = await _authenticate(body)
+    if not await tasks_check_limiter.is_allowed(f"va:{_va_user['user_id']}"):
+        raise HTTPException(status_code=429, detail="too_many_attempts")
     channel_id = body.channel_id.strip()
     if not channel_id:
         raise HTTPException(status_code=400, detail="missing_channel")
@@ -6233,7 +6337,9 @@ async def api_tasks_create(body: UserTaskCreateRequest):
     channel_id = body.channel_id.strip()
     if not title or not link:
         raise HTTPException(status_code=400, detail="missing_fields")
-    if not link.lower().startswith(("https://t.me/", "http://t.me/", "tg://")):
+    if not re.match(r"^https://t\.me/(\+[A-Za-z0-9_-]{10,}|[A-Za-z][A-Za-z0-9_]{4,31})/?$", link):
+        # M7: only real channel links — the loose prefix check admitted
+        # tg://proxy, /socks and /share URLs that are not channels.
         raise HTTPException(status_code=400, detail="invalid_link")
 
     min_reward = float(await DataEngine.get_setting("user_task_min_reward", "1"))
@@ -6987,11 +7093,21 @@ async def send_db_backup():
         return
     try:
         stamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-UTC")
-        await bot.send_document(
-            chat_id=DB_BACKUP_CHANNEL_ID,
-            document=FSInputFile(DB_PATH, filename=f"referral_bot_{stamp}.db"),
-            caption=f"🗄 Automatic DB backup — {stamp}",
-        )
+        # M5: the DB runs in WAL mode — copying the main file alone can
+        # produce a stale/torn backup. VACUUM INTO writes a consistent
+        # snapshot first; send that, then clean it up.
+        snap_path = f"/tmp/anon_earn_backup_{stamp}.db"
+        async with aiosqlite.connect(DB_PATH) as _db:
+            await _db.execute(f"VACUUM INTO '{snap_path}'")
+        try:
+            await bot.send_document(
+                chat_id=DB_BACKUP_CHANNEL_ID,
+                document=FSInputFile(snap_path, filename=f"referral_bot_{stamp}.db"),
+                caption=f"🗄 Automatic DB backup — {stamp}",
+            )
+        finally:
+            if os.path.exists(snap_path):
+                os.remove(snap_path)
         logger.info(f"DB backup sent to {DB_BACKUP_CHANNEL_ID}")
     except Exception as e:
         logger.warning(f"DB backup failed: {e}")
