@@ -3903,7 +3903,7 @@ async def dispatch_withdrawal_core(
     user = await DataEngine.get_user(uid)
     me   = await bot.get_me()
     proof_channel_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🚀 Invite Now", url=f"https://t.me/{me.username}")
+        InlineKeyboardButton(text="🚀 Start Earn", url=f"https://t.me/{me.username}")
     ]])
 
     method_label = "Binance Pay" if is_binance else "Telebirr Portal"
@@ -3930,7 +3930,15 @@ async def dispatch_withdrawal_core(
                 f"⏰ <b>Timestamp:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━"
             )
-            receipt = await bot.send_message(PAYMENT_LOG_CHANNEL, txt, reply_markup=proof_channel_keyboard)
+            if is_binance:
+                receipt = await bot.send_message(PAYMENT_LOG_CHANNEL, txt, reply_markup=proof_channel_keyboard)
+            else:
+                # Telebirr requests carry the Telebirr image, like the
+                # completion proof does (owner spec 2026-11-26).
+                try:
+                    receipt = await bot.send_photo(PAYMENT_LOG_CHANNEL, photo=TELEBIRR_PROOF_IMAGE, caption=txt, reply_markup=proof_channel_keyboard)
+                except Exception:
+                    receipt = await bot.send_message(PAYMENT_LOG_CHANNEL, txt, reply_markup=proof_channel_keyboard)
             post_id = receipt.message_id
             await DataEngine.update_withdrawal_status(tid, "pending", post_id)
         except Exception as e:
@@ -4190,7 +4198,7 @@ async def approve_withdrawal_core(tid: int, notify_mode: str = "both") -> dict:
         return {"ok": False, "reason": "already_processed"}
     me = await bot.get_me()
     proof_channel_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🚀 Invite Now", url=f"https://t.me/{me.username}")
+        InlineKeyboardButton(text="🚀 Start Earn", url=f"https://t.me/{me.username}")
     ]])
     recipient_label = "Binance UID" if is_binance else "Recipient"
     recipient_value = ticket["binance_uid"] if is_binance else ticket["full_name"]
