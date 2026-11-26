@@ -3,10 +3,11 @@ import { api, API_BASE, initData, tg, type Me } from "./api";
 import Home from "./screens/Home";
 import Tasks from "./screens/Tasks";
 import Invite from "./screens/Invite";
+import Top from "./screens/Top";
 import Withdraw from "./screens/Withdraw";
 import Admin from "./screens/Admin";
 
-export type Tab = "home" | "tasks" | "invite" | "withdraw" | "admin";
+export type Tab = "home" | "tasks" | "invite" | "top" | "withdraw" | "admin";
 
 interface AppCtx {
   me: Me | null;
@@ -94,6 +95,7 @@ export default function App() {
     { id: "home", icon: "🏠", label: "Home", show: true },
     { id: "tasks", icon: "🎯", label: "Tasks", show: true },
     { id: "invite", icon: "🔗", label: "Invite", show: true },
+    { id: "top", icon: "🏆", label: "Top", show: true },
     { id: "withdraw", icon: "💸", label: "Withdraw", show: true },
     { id: "admin", icon: "⚙️", label: "Admin", show: !!me?.is_admin },
   ];
@@ -194,6 +196,7 @@ export default function App() {
             {tab === "home" && <Home />}
             {tab === "tasks" && <Tasks />}
             {tab === "invite" && <Invite />}
+            {tab === "top" && <Top />}
             {tab === "withdraw" && <Withdraw />}
             {tab === "admin" && me?.is_admin && <Admin />}
           </div>
