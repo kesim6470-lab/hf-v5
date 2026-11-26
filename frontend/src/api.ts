@@ -28,21 +28,52 @@ export class ApiError extends Error {
   }
 }
 
+/* 15-second read cache (owner request 2026-11-26): switching between
+   screens re-mounts them and would otherwise re-ask the server for the
+   same data every few seconds — congestion + stutter. Read-style
+   endpoints are served from memory for 15s; ANY action call (join,
+   claim, withdraw, admin saves…) clears the whole cache first, so
+   state is never stale after something changes. */
+const READ_PATHS = new Set([
+  "/api/me", "/api/tasks", "/api/tasks/mine", "/api/leaderboard",
+  "/api/ads/status", "/api/dailycheck/status", "/api/gate/status",
+  "/api/withdraw/history", "/api/withdrawals/recent",
+  "/api/admin/stats/overview", "/api/admin/settings",
+  "/api/admin/withdrawals/list", "/api/admin/tasks/list",
+  "/api/admin/tasks/pending", "/api/admin/tasks/manual_submissions",
+  "/api/admin/channels/list", "/api/admin/weekly_top",
+  "/api/admin/ads/analytics", "/api/admin/users/search",
+]);
+const CACHE_TTL_MS = 15_000;
+const _readCache = new Map<string, { at: number; data: any }>();
+
+export function clearApiCache(): void { _readCache.clear(); }
+
 export async function api<T = any>(path: string, body: Record<string, any> = {}): Promise<T> {
+  const isRead = READ_PATHS.has(path);
+  const cacheKey = path + "|" + JSON.stringify(body);
+  if (isRead) {
+    const hit = _readCache.get(cacheKey);
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data as T;
+  } else {
+    _readCache.clear();
+  }
+  let data: any;
   if (path === "/api/withdrawals/recent") {
     // The public ticker is a plain GET in the backend (no initData).
     const res = await fetch(`${API_BASE}${path}`);
     if (!res.ok) throw new ApiError(res.status, res.statusText);
-    return (await res.json()) as T;
+    data = await res.json();
+  } else {
+    const r = await fetch(API_BASE + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData, ...body }),
+    });
+    try { data = await r.json(); } catch { data = null; /* non-JSON */ }
+    if (!r.ok) throw new ApiError(r.status, (data && data.detail) || `http_${r.status}`);
   }
-  const r = await fetch(API_BASE + path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ initData, ...body }),
-  });
-  let data: any = null;
-  try { data = await r.json(); } catch { /* non-JSON */ }
-  if (!r.ok) throw new ApiError(r.status, (data && data.detail) || `http_${r.status}`);
+  if (isRead) _readCache.set(cacheKey, { at: Date.now(), data });
   return data as T;
 }
 
