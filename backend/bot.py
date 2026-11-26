@@ -3113,7 +3113,7 @@ async def debug_log_all_callbacks(handler, event: CallbackQuery, data):
 # claims inside that window skip Telegram entirely. A user who LEAVES a
 # channel is caught at the next check after the cache expires (≤60s).
 _gate_ok_cache: dict = {}
-_GATE_OK_TTL = 30.0  # was 60s — owner order 2026-11-26: catch channel-leavers faster; still bounds Telegram API load
+_GATE_OK_TTL = 300.0  # owner order 2026-11-26 (final): membership re-checked at most every 5 min per user — repeated live checks would hammer Telegram + the server
 
 
 async def inspect_compulsory_memberships(user_id: int) -> list:
