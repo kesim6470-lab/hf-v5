@@ -81,6 +81,20 @@ export interface AdsStatus {
   };
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  refs: number;
+  earned: number;
+  is_me: boolean;
+}
+
+export interface Leaderboard {
+  updated_at: string;
+  top: LeaderboardEntry[];
+  me: { rank: number | null; refs: number; earned: number };
+}
+
 export interface DailyStatus {
   enabled: boolean;
   reward: number;
