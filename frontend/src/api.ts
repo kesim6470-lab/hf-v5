@@ -44,7 +44,7 @@ const READ_PATHS = new Set([
   "/api/admin/channels/list", "/api/admin/weekly_top",
   "/api/admin/ads/analytics", "/api/admin/users/search",
 ]);
-const CACHE_TTL_MS = 15_000;
+const CACHE_TTL_MS = 40_000; // owner order 2026-11-26: reads cached 40s; any action call clears the cache and always hits the server fresh
 const _readCache = new Map<string, { at: number; data: any }>();
 
 export function clearApiCache(): void { _readCache.clear(); }
