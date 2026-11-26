@@ -65,6 +65,7 @@ export interface Me {
 
 export interface AdsStatus {
   enabled: boolean;
+  maintenance: boolean;
   block_id: string;
   reward_amount: number;
   daily_limit: number;
@@ -85,6 +86,7 @@ export interface DailyStatus {
   reward: number;
   claimed_today: boolean;
   streak: number;
+  ad_required: boolean;
   ad_watched_recently: boolean;
   reminder_text: string;
 }
