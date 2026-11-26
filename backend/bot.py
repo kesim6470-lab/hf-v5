@@ -372,6 +372,14 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('usdt_rate', '155');
 
 -- AdsGram — rewarded video
 INSERT OR IGNORE INTO settings (key, value) VALUES ('ads_enabled', '0');
+-- Owner directive 2026-11-26: until the AdsGram block is approved, the
+-- Daily Check-in pays WITHOUT an ad view (daily_checkin_require_ad='0')
+-- and Watch Ads shows as "under maintenance" (ads_maintenance='1').
+-- Both are ordinary settings — the admin flips them from the Mini App
+-- Admin panel when AdsGram goes live. INSERT OR IGNORE: an admin's
+-- later change is never overwritten by a restart.
+INSERT OR IGNORE INTO settings (key, value) VALUES ('daily_checkin_require_ad', '0');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('ads_maintenance', '1');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('adsgram_block_id', '');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('monetag_zone_id', '');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('monetag_sdk_url', '');
@@ -1344,7 +1352,7 @@ class DataEngine:
             return False
 
     @staticmethod
-    async def claim_daily_checkin_atomic(user_id: int, reward: float) -> tuple[bool, str, int]:
+    async def claim_daily_checkin_atomic(user_id: int, reward: float, require_ad: bool = True) -> tuple[bool, str, int]:
         """Re-checks 'not already claimed today' AND pays the reward, all
         inside one BEGIN EXCLUSIVE transaction — same double-claim
         protection pattern as withdrawals. Streak continues if the last
@@ -1373,24 +1381,31 @@ class DataEngine:
                 # postback consumed the /api/dailycheck/arm mark) counts,
                 # and flipping it to 'checkin_claimed' here means one
                 # armed view can only ever unlock one claim.
-                cur_ad = await db.execute(
-                    "SELECT id, completed_at FROM ad_events WHERE user_id=? AND kind='video' "
-                    "AND status='completed_checkin' ORDER BY completed_at DESC LIMIT 1",
-                    (user_id,),
-                )
-                ad_row = await cur_ad.fetchone()
-                ad_ok = False
-                if ad_row and ad_row[1]:
-                    try:
-                        ad_elapsed = (datetime.utcnow() - datetime.strptime(ad_row[1], "%Y-%m-%d %H:%M:%S")).total_seconds()
-                        ad_ok = 0 <= ad_elapsed <= 600
-                    except Exception:
-                        ad_ok = False
+                # require_ad=False (owner directive 2026-11-26, while
+                # the AdsGram block awaits approval): no ad view is
+                # needed or consumed — the once-a-day guard above is
+                # the only gate.
+                ad_row = None
+                ad_ok = not require_ad
+                if require_ad:
+                    cur_ad = await db.execute(
+                        "SELECT id, completed_at FROM ad_events WHERE user_id=? AND kind='video' "
+                        "AND status='completed_checkin' ORDER BY completed_at DESC LIMIT 1",
+                        (user_id,),
+                    )
+                    ad_row = await cur_ad.fetchone()
+                    if ad_row and ad_row[1]:
+                        try:
+                            ad_elapsed = (datetime.utcnow() - datetime.strptime(ad_row[1], "%Y-%m-%d %H:%M:%S")).total_seconds()
+                            ad_ok = 0 <= ad_elapsed <= 600
+                        except Exception:
+                            ad_ok = False
                 if not ad_ok:
                     await db.execute("ROLLBACK")
                     return False, "watch_ad_first", (row[1] or 0) if row else 0
-                await db.execute(
-                    "UPDATE ad_events SET status='checkin_claimed' WHERE id=?", (ad_row[0],))
+                if ad_row:
+                    await db.execute(
+                        "UPDATE ad_events SET status='checkin_claimed' WHERE id=?", (ad_row[0],))
 
                 new_streak = ((row[1] or 0) + 1) if (row and row[0] == yesterday) else 1
 
@@ -5524,6 +5539,7 @@ async def api_ads_status(body: ApiBase):
     uid = user["user_id"]
 
     ads_enabled      = (await DataEngine.get_setting("ads_enabled", "0")) == "1"
+    ads_maintenance  = (await DataEngine.get_setting("ads_maintenance", "1")) == "1"
     block_id         = await DataEngine.get_setting("adsgram_block_id", "") or ""
     reward_amount    = float(await DataEngine.get_setting("ad_reward_amount", "0.5"))
     daily_limit      = int(await DataEngine.get_setting("ad_daily_limit", "10"))
@@ -5582,7 +5598,8 @@ async def api_ads_status(body: ApiBase):
     require_banner_click   = (await DataEngine.get_setting("ad_require_banner_click", "0")) == "1"
 
     return {
-        "enabled": ads_enabled and bool(block_id or monetag_zone_id),
+        "enabled": ads_enabled and not ads_maintenance and bool(block_id or monetag_zone_id),
+        "maintenance": ads_maintenance,
         "block_id": block_id,
         "reward_amount": reward_amount,
         "daily_limit": daily_limit,
@@ -5635,6 +5652,7 @@ async def api_dailycheck_status(body: ApiBase):
         "reward": reward,
         "claimed_today": status["claimed_today"],
         "streak": status["streak"],
+        "ad_required": (await DataEngine.get_setting("daily_checkin_require_ad", "0")) == "1",
         "ad_watched_recently": await DataEngine.has_recent_checkin_ad(uid),
         "reminder_text": reminder_text,
     }
@@ -5658,6 +5676,9 @@ async def api_dailycheck_arm(body: ApiBase):
     pointless (and, before this, still got recorded as a view)."""
     user = await _authenticate(body)
     uid = user["user_id"]
+    if (await DataEngine.get_setting("daily_checkin_require_ad", "0")) != "1":
+        # No ad view is required right now — nothing to arm.
+        return {"ok": True, "ad_required": False}
     status = await DataEngine.get_daily_checkin_status(uid)
     if status["claimed_today"]:
         raise HTTPException(status_code=400, detail="already_claimed")
@@ -5667,11 +5688,13 @@ async def api_dailycheck_arm(body: ApiBase):
 
 @api_app.post("/api/dailycheck/claim")
 async def api_dailycheck_claim(body: ApiBase):
-    """Requires a genuinely S2S-confirmed ad view (see
-    has_recent_completed_ad) in the last few minutes before the once-daily
-    bonus can be claimed — same trust model as the regular ad reward, so
-    this can't be claimed by just calling the API without watching
-    anything."""
+    """When daily_checkin_require_ad is on (the default once AdsGram is
+    live), requires a genuinely S2S-confirmed ad view in the last few
+    minutes before the once-daily bonus can be claimed — same trust
+    model as the regular ad reward. While the setting is off (owner
+    directive 2026-11-26, until the AdsGram block is approved) the
+    bonus claims directly with no ad view; the once-a-day atomic guard
+    still applies either way."""
     user = await _authenticate(body)
     uid = user["user_id"]
 
@@ -5680,14 +5703,17 @@ async def api_dailycheck_claim(body: ApiBase):
     if not enabled:
         raise HTTPException(status_code=400, detail="disabled")
 
+    require_ad = (await DataEngine.get_setting("daily_checkin_require_ad", "0")) == "1"
     # Fast-fail pre-check only — claim_daily_checkin_atomic re-verifies
     # (and consumes) the armed view inside its transaction. A regular
     # paid Watch & Earn view does not satisfy this (BUG-REPORT #7).
-    if not await DataEngine.has_recent_checkin_ad(uid):
+    # While require_ad is off (owner directive 2026-11-26, until the
+    # AdsGram block is approved) the bonus claims directly, no ad view.
+    if require_ad and not await DataEngine.has_recent_checkin_ad(uid):
         raise HTTPException(status_code=400, detail="watch_ad_first")
 
     reward = float(await DataEngine.get_setting("daily_checkin_reward", "5"))
-    ok, reason, streak = await DataEngine.claim_daily_checkin_atomic(uid, reward)
+    ok, reason, streak = await DataEngine.claim_daily_checkin_atomic(uid, reward, require_ad)
     if not ok:
         raise HTTPException(status_code=400, detail=reason)
 
@@ -5704,6 +5730,8 @@ async def api_ads_claim(body: ApiBase):
 
     ads_enabled = (await DataEngine.get_setting("ads_enabled", "0")) == "1"
     await _require_force_joined(uid)
+    if (await DataEngine.get_setting("ads_maintenance", "1")) == "1":
+        raise HTTPException(status_code=400, detail="under_maintenance")
     block_id = (await DataEngine.get_setting("adsgram_block_id", "") or "").strip()
     monetag_zone_id = (await DataEngine.get_setting("monetag_zone_id", "") or "").strip()
     if not ads_enabled or not (block_id or monetag_zone_id):
