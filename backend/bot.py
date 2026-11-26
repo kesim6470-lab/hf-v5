@@ -827,17 +827,23 @@ class DataEngine:
         await DataEngine.set_setting(
             "leaderboard_updated_at", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
 
-    # Test/demo data for the Top Referrers board (owner request
-    # 2026-11-26): seven sample referrers. SECURITY (Claude round-3 N1,
+    # Test/demo data for the Top Referrers board. SECURITY (Claude round-3 N1,
     # CRITICAL): test IDs are NEGATIVE — Telegram user IDs are always
     # positive and passed 990M years ago, so the old positive base
     # (990000000) made clear_test_leaderboard delete nearly every REAL
     # user. A negative range can never collide with a real account.
+    # Owner request 2026-11-26 (late): names + referral counts imported
+    # from the old Hf bot database he supplied — top 20 referrers there
+    # (banned referrers and his own accounts excluded; two names that
+    # were pure symbols/invisible use their @username instead). This
+    # replaces the earlier 15-name sample list.
     TEST_LEADERBOARD = [
-        ("Samira", 30), ("dawit T", 27), ("Abdi", 24), ("Mule Mosisa", 22),
-        ("Yoni", 19), ("Tame", 17), ("wildflower", 15), ("Bura", 13),
-        ("Suru", 11), ("Da", 10), ("Unfair World", 8), ("Muaze", 7),
-        ("Kasahun", 6), ("Nati", 5), ("Cr 7", 4),
+        ("Adadis", 22), ("BU", 19), ("Naaf yaad", 17), ("FX", 16),
+        ("Můllèŕ", 14), ("ĆŔºŅŐŜ", 13), ("Faye Øro", 13), ("Abdela", 13),
+        ("ram", 13), ("K", 12), ("Brook", 12), ("Heavyduties", 12),
+        ("𝓢𝓐𝓝𝓓𝓔𝓡𝓞𝓢", 12), ("Amin", 12), ("NOTFND404", 12),
+        ("𝓩𝓪𝓷𝓮𝓮𝓮", 11), ("Yaku", 11), ("Jesus is my peace!", 11),
+        ("Khalid", 11), ("Yobi", 10),
     ]
     TEST_ID_BASE = -1_000_000
 
