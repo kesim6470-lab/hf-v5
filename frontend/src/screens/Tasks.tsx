@@ -16,6 +16,12 @@ export default function Tasks() {
   const [view, setView] = useState<"all" | "mine" | "create">("all");
   const [mine, setMine] = useState<Task[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
+  // Loading flags: without them the empty-state text ("No tasks right
+  // now") flashes on screen while the first fetch is still in flight
+  // (owner report 2026-11-26). Empty text shows only after a load
+  // has actually completed with zero rows.
+  const [loading, setLoading] = useState(true);
+  const [mineLoading, setMineLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -23,6 +29,7 @@ export default function Tasks() {
       setTasks(r.tasks || []);
       setCfg(r.user_task_config);
     } catch (e: any) { toast(e?.message || "Couldn't load tasks"); }
+    finally { setLoading(false); }
   }, [toast]);
 
   const loadMine = useCallback(async () => {
@@ -30,6 +37,7 @@ export default function Tasks() {
       const r = await api<{ tasks: Task[] }>("/api/tasks/mine");
       setMine(r.tasks || []);
     } catch { /* ignore */ }
+    finally { setMineLoading(false); }
   }, []);
 
   useEffect(() => { load(); loadMine(); }, [load, loadMine]);
@@ -130,6 +138,7 @@ export default function Tasks() {
       </div>
 
       {view === "all" && (
+        loading && tasks.length === 0 ? <div className="empty"><Spinner /> Loading tasks…</div> :
         tasks.length === 0 ? <div className="empty">No tasks right now</div> :
         tasks.map((t, i) => (
           <div className="row" key={t.id}>
@@ -169,6 +178,7 @@ export default function Tasks() {
       )}
 
       {view === "mine" && (
+        mineLoading && mine.length === 0 ? <div className="empty"><Spinner /> Loading tasks…</div> :
         mine.length === 0 ? <div className="empty">You haven't created any tasks yet</div> :
         mine.map((t) => (
           <div className="row" key={t.id}>
