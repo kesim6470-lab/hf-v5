@@ -1,4 +1,5 @@
-import { fmt, tg } from "../api";
+import { useEffect, useState } from "react";
+import { api, fmt, tg, type Leaderboard } from "../api";
 import { useApp } from "../App";
 
 /** Invite / Friends: referral stats, copyable link, and the Telegram
@@ -16,6 +17,12 @@ import { useApp } from "../App";
  *  as plain text. */
 export default function Invite() {
   const { me, toast } = useApp();
+  const [board, setBoard] = useState<Leaderboard | null>(null);
+
+  useEffect(() => {
+    api<Leaderboard>("/api/leaderboard").then(setBoard).catch(() => {});
+  }, []);
+
   if (!me) return <div className="empty">Loading…</div>;
 
   const referralLink = me.referral_link;
@@ -72,6 +79,50 @@ export default function Invite() {
       <button className="btn ghost" onClick={() => { navigator.clipboard?.writeText(referralLink); toast("Link copied 📋"); }}>
         📋 Copy link
       </button>
+
+      <h3 className="sect">🏆 Top Referrers</h3>
+      {board && board.top.length > 0 ? (
+        <div className="card">
+          {(() => {
+            const [first, second, third, ...rest] = board.top;
+            const pod = (r: typeof first, medal: string, cls: string) => (
+              <div className={`pod ${cls}${r.is_me ? " me" : ""}`} key={r.rank}>
+                <div className="medal">{medal}</div>
+                <div className="nm">{r.name}{r.is_me ? " (You)" : ""}</div>
+                <div className="rf">{r.refs} 👥</div>
+                <div className="er">{fmt(r.earned)} Birr</div>
+              </div>
+            );
+            return (
+              <>
+                <div className="podium">
+                  {second ? pod(second, "🥈", "p2") : <div className="pod" style={{ visibility: "hidden" }} />}
+                  {first && pod(first, "🏆", "p1")}
+                  {third ? pod(third, "🥉", "p3") : <div className="pod" style={{ visibility: "hidden" }} />}
+                </div>
+                {rest.map((r) => (
+                  <div className="lbrow" key={r.rank}>
+                    <span className="rk">#{r.rank}</span>
+                    <span className="nm">{r.name}{r.is_me ? " (You)" : ""}</span>
+                    <span className="vl">{r.refs} 👥 <small>· {fmt(r.earned)} Birr</small></span>
+                  </div>
+                ))}
+              </>
+            );
+          })()}
+          <div className="s" style={{ color: "var(--muted)", fontSize: 12, marginTop: 12 }}>
+            🕐 Updates every 12 hours
+            {board.me.rank
+              ? ` · Your rank: #${board.me.rank}`
+              : board.me.refs > 0
+                ? ` · You have ${board.me.refs} 👥 — keep going!`
+                : ""}
+          </div>
+        </div>
+      ) : (
+        <div className="empty">No one is on the board yet — invite friends and take the 🏆!</div>
+      )}
+
       {me.support_username && (
         <div className="empty">Need help? Contact @{me.support_username}</div>
       )}
