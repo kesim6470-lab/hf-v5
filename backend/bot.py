@@ -816,8 +816,8 @@ class DataEngine:
     # (990000000) made clear_test_leaderboard delete nearly every REAL
     # user. A negative range can never collide with a real account.
     TEST_LEADERBOARD = [
-        ("Samira", 25), ("Abdi", 18), ("Yoni", 12), ("Bura", 9),
-        ("Da", 7), ("Muaze", 5), ("Nati", 3),
+        ("dawit T", 25), ("Mule Mosisa", 21), ("Tame", 18), ("wildflower", 15),
+        ("Suru", 12), ("Unfair World", 9), ("Kasahun", 6), ("Cr 7", 4),
     ]
     TEST_ID_BASE = -1_000_000
 
@@ -829,7 +829,7 @@ class DataEngine:
                 rid = DataEngine.TEST_ID_BASE - (i + 1)
                 await db.execute(
                     "INSERT OR IGNORE INTO users (user_id, username, full_name) VALUES (?,?,?)",
-                    (rid, name.lower() + "_test", name))
+                    (rid, name.lower().replace(" ", "_") + "_test", name))
                 for _ in range(refs):
                     invitee -= 1
                     await db.execute(
@@ -841,7 +841,7 @@ class DataEngine:
     @staticmethod
     async def clear_test_leaderboard():
         async with aiosqlite.connect(DB_PATH) as db:
-            # Hard safety cap: the seed creates 7 + 79 = 86 rows. Refuse
+            # Hard safety cap: the seed creates 8 + 110 = 118 rows. Refuse
             # to delete if the negative range somehow holds far more.
             cur = await db.execute("SELECT COUNT(*) FROM users WHERE user_id < 0")
             if (await cur.fetchone())[0] > 500:
@@ -912,10 +912,32 @@ class DataEngine:
         return 0.0
 
     @staticmethod
+    async def weekly_top_excluded() -> list[int]:
+        """User IDs the owner removed from the Weekly Top board
+        (setting weekly_top_exclude_ids, comma-separated; owner request
+        2026-11-26 to remove his own accounts). Excluded users neither
+        display on the board nor get paid."""
+        raw = await DataEngine.get_setting("weekly_top_exclude_ids", "")
+        out = []
+        for part in raw.replace(";", ",").split(","):
+            part = part.strip()
+            if part.lstrip("-").isdigit():
+                out.append(int(part))
+        return out
+
+    @staticmethod
     async def get_weekly_top(start: datetime, end: datetime, limit: int = 20):
         """Top referrers by PAID referrals inside [start, end).
         Banned referrers excluded; test/demo referrers (negative IDs)
         stay visible on the board but are filtered out at payout."""
+        excl = await DataEngine.weekly_top_excluded()
+        excl_sql = ""
+        params: list = [start.strftime("%Y-%m-%d %H:%M:%S"),
+                        end.strftime("%Y-%m-%d %H:%M:%S")]
+        if excl:
+            excl_sql = "AND r.referred_by NOT IN (" + ",".join("?" * len(excl)) + ") "
+            params += excl
+        params.append(limit)
         async with aiosqlite.connect(DB_PATH) as db:
             cur = await db.execute(
                 "SELECT r.referred_by, u.full_name, u.username, COUNT(*) AS refs "
@@ -923,9 +945,9 @@ class DataEngine:
                 "WHERE r.referred_by IS NOT NULL AND r.referral_paid = 1 "
                 "AND r.joined_at >= ? AND r.joined_at < ? "
                 "AND COALESCE(u.is_banned, 0) = 0 "
+                + excl_sql +
                 "GROUP BY r.referred_by ORDER BY refs DESC, u.joined_at ASC LIMIT ?",
-                (start.strftime("%Y-%m-%d %H:%M:%S"),
-                 end.strftime("%Y-%m-%d %H:%M:%S"), limit))
+                tuple(params))
             rows = await cur.fetchall()
             return [{"user_id": r[0], "full_name": r[1], "username": r[2], "refs": r[3]}
                     for r in rows]
@@ -942,15 +964,24 @@ class DataEngine:
             refs = (await cur.fetchone())[0] or 0
             if refs == 0:
                 return 0, None
+            excl = await DataEngine.weekly_top_excluded()
+            if user_id in excl:
+                return refs, None
+            excl_sql = ""
+            params: list = [start.strftime("%Y-%m-%d %H:%M:%S"),
+                            end.strftime("%Y-%m-%d %H:%M:%S")]
+            if excl:
+                excl_sql = "AND u.user_id NOT IN (" + ",".join("?" * len(excl)) + ") "
+                params += excl
+            params.append(refs)
             cur = await db.execute(
                 "SELECT COUNT(*) FROM (SELECT r.referred_by, COUNT(*) AS c "
                 "FROM users r JOIN users u ON u.user_id = r.referred_by "
                 "WHERE r.referred_by IS NOT NULL AND r.referral_paid = 1 "
                 "AND r.joined_at >= ? AND r.joined_at < ? "
-                "AND COALESCE(u.is_banned, 0) = 0 GROUP BY r.referred_by) "
+                "AND COALESCE(u.is_banned, 0) = 0 " + excl_sql + "GROUP BY r.referred_by) "
                 "WHERE c > ?",
-                (start.strftime("%Y-%m-%d %H:%M:%S"),
-                 end.strftime("%Y-%m-%d %H:%M:%S"), refs))
+                tuple(params))
             return refs, (await cur.fetchone())[0] + 1
 
     @staticmethod
@@ -5840,6 +5871,7 @@ async def api_admin_weekly_top(body: ApiBase):
     return {
         "enabled": cfg["enabled"], "pool": cfg["pool"], "percents": cfg["percents"],
         "last_paid": await DataEngine.get_setting("weekly_top_last_paid", ""),
+        "exclude_ids": await DataEngine.weekly_top_excluded(),
     }
 
 
@@ -5847,6 +5879,7 @@ class AdminWeeklyTopSave(ApiBase):
     pool: float
     percents: list[float]
     enabled: bool = True
+    exclude_ids: list[int] = []
 
 
 @api_app.post("/api/admin/weekly_top/save")
@@ -5861,9 +5894,13 @@ async def api_admin_weekly_top_save(body: AdminWeeklyTopSave):
     total = sum(body.percents)
     if abs(total - 100) > 0.51:
         raise HTTPException(400, f"Percentages must add up to 100 (now {total:.1f})")
+    if len(body.exclude_ids) > 100 or any(x <= 0 for x in body.exclude_ids):
+        raise HTTPException(400, "Excluded IDs must be positive user IDs (max 100)")
     await DataEngine.set_setting("weekly_top_pool", str(body.pool))
     await DataEngine.set_setting("weekly_top_percents", json.dumps(body.percents))
     await DataEngine.set_setting("weekly_top_enabled", "1" if body.enabled else "0")
+    await DataEngine.set_setting(
+        "weekly_top_exclude_ids", ",".join(str(x) for x in body.exclude_ids))
     return {"ok": True}
 
 
