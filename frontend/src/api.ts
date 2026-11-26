@@ -85,14 +85,16 @@ export interface LeaderboardEntry {
   rank: number;
   name: string;
   refs: number;
-  earned: number;
+  pct: number;
+  prize: number;
   is_me: boolean;
 }
 
 export interface Leaderboard {
   updated_at: string;
+  weekly: { enabled: boolean; pool: number; week_id: string; ends_at: string; seconds_left: number };
   top: LeaderboardEntry[];
-  me: { rank: number | null; refs: number; earned: number };
+  me: { rank: number | null; refs: number; prize: number };
 }
 
 export interface DailyStatus {
