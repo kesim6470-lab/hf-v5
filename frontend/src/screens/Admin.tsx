@@ -48,6 +48,16 @@ function Overview() {
   const { toast } = useApp();
   const [stats, setStats] = useState<any>(null);
   useEffect(() => { api("/api/admin/stats/overview").then(setStats).catch(() => {}); }, []);
+  // Weekly Top 20 reward config (pool + rank percentages). NOTE: these
+  // hooks MUST stay above the early return below — hooks after a
+  // conditional return crash React ("Rendered more hooks than during
+  // the previous render") and blank the whole app.
+  const [wk, setWk] = useState<{ pool: number; percents: string; enabled: boolean; last_paid: string } | null>(null);
+  useEffect(() => {
+    api<any>("/api/admin/weekly_top").then((r) => setWk({
+      pool: r.pool, percents: r.percents.join(", "), enabled: r.enabled, last_paid: r.last_paid || "",
+    })).catch(() => {});
+  }, []);
   if (!stats) return <Shimmer rows={3} />;
 
   async function seedTest() {
@@ -67,13 +77,6 @@ function Overview() {
     } catch (e: any) { toast(e?.message || "Failed"); }
   }
 
-  // Weekly Top 20 reward config (pool + rank percentages)
-  const [wk, setWk] = useState<{ pool: number; percents: string; enabled: boolean; last_paid: string } | null>(null);
-  useEffect(() => {
-    api<any>("/api/admin/weekly_top").then((r) => setWk({
-      pool: r.pool, percents: r.percents.join(", "), enabled: r.enabled, last_paid: r.last_paid || "",
-    })).catch(() => {});
-  }, []);
   async function saveWeekly() {
     if (!wk) return;
     const percents = wk.percents.split(",").map((x) => Number(x.trim())).filter((x) => !Number.isNaN(x));
