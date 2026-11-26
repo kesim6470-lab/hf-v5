@@ -8,22 +8,29 @@ import { Shimmer, Spinner } from "../components/ui";
  *  dark rounded square; Telebirr = blue swirl mark on a white rounded
  *  square. */
 export const BinanceIcon = () => (
-  <svg viewBox="0 0 32 32" width="20" height="20" aria-hidden="true">
+  <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true">
     <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="#1E2329" />
     <g fill="#F0B90B">
-      <rect x="13.9" y="13.9" width="4.2" height="4.2" transform="rotate(45 16 16)" />
-      <rect x="14.1" y="6.9" width="3.8" height="3.8" transform="rotate(45 16 8.8)" />
-      <rect x="14.1" y="21.3" width="3.8" height="3.8" transform="rotate(45 16 23.2)" />
-      <rect x="6.9" y="14.1" width="3.8" height="3.8" transform="rotate(45 8.8 16)" />
-      <rect x="21.3" y="14.1" width="3.8" height="3.8" transform="rotate(45 23.2 16)" />
+      <rect x="13.25" y="13.25" width="5.5" height="5.5" transform="rotate(45 16 16)" />
+      <rect x="13.7" y="7" width="4.6" height="4.6" transform="rotate(45 16 9.3)" />
+      <rect x="13.7" y="20.4" width="4.6" height="4.6" transform="rotate(45 16 22.7)" />
+      <rect x="7" y="13.7" width="4.6" height="4.6" transform="rotate(45 9.3 16)" />
+      <rect x="20.4" y="13.7" width="4.6" height="4.6" transform="rotate(45 22.7 16)" />
     </g>
   </svg>
 );
 export const TelebirrIcon = () => (
-  <svg viewBox="0 0 32 32" width="20" height="20" aria-hidden="true">
+  <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true">
     <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="#FFFFFF" stroke="#E2E8F0" />
-    <path d="M8.5 10.2c4.8-2.3 10.6-2.5 15-.7M15.8 9.4v9.3a4.6 4.6 0 1 1-4.6-4.6"
-      fill="none" stroke="#1596D6" stroke-width="2.7" stroke-linecap="round" />
+    <g fill="#1596D6">
+      {/* top flag: stem top flaring right into a curved boot */}
+      <path d="M16.5 5.5 L16.5 11.8 C16.5 14.3 18 15.5 20.8 15.5 L25.8 15.5 C23.2 12.8 21.8 9.2 21.3 5.5 Z" />
+      {/* left funnel wedge pointing right */}
+      <path d="M6.5 13.2 C10 14.8 12.8 15.8 15.2 16.6 C12.8 17.4 10 18.6 6.5 19.8 C7.8 17.6 7.8 15.4 6.5 13.2 Z" />
+    </g>
+    {/* stem descending into the swirl */}
+    <path d="M18.9 11.5 L18.9 18.6 C15 19.4 13 21.9 13.7 24.9 C14.4 28 17.9 29.2 20.7 28.1 C23.3 27.1 24.3 24.3 23.2 22.1 C22.3 20.3 20.1 19.7 18.8 20.9"
+      fill="none" stroke="#1596D6" stroke-width="2.9" stroke-linecap="round" />
   </svg>
 );
 
