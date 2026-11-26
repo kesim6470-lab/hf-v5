@@ -3009,16 +3009,30 @@ async def debug_log_all_callbacks(handler, event: CallbackQuery, data):
 # ─────────────────────────────────────────────────────────────────────────────
 # FORCE JOIN LOGIC
 # ─────────────────────────────────────────────────────────────────────────────
+# Speed (owner complaint 2026-11-26: app felt slow): membership checks
+# used to run one Telegram API call per channel, SEQUENTIALLY, on the boot
+# gate and on every claim — each call adds a network round trip, so the
+# Home screen and the check-in / ad-reward claims all waited on them.
+# Now: (1) all channel checks run in PARALLEL (asyncio.gather), and (2) a
+# user confirmed as fully-joined is cached for 60s, so repeat opens and
+# claims inside that window skip Telegram entirely. A user who LEAVES a
+# channel is caught at the next check after the cache expires (≤60s).
+_gate_ok_cache: dict = {}
+_GATE_OK_TTL = 60.0
+
+
 async def inspect_compulsory_memberships(user_id: int) -> list:
+    _exp = _gate_ok_cache.get(user_id)
+    if _exp and _exp > time.monotonic():
+        return []
     channels = await DataEngine.get_force_channels()
-    unjoined = []
-    for ch in channels:
-        if ch["bot_added"] == 1:
-            continue
+    real_channels = [ch for ch in channels if ch["bot_added"] != 1]
+
+    async def _check(ch):
         try:
             m = await bot.get_chat_member(chat_id=ch["channel_id"], user_id=user_id)
             if m.status in (ChatMemberStatus.LEFT, ChatMemberStatus.KICKED, ChatMemberStatus.RESTRICTED):
-                unjoined.append(dict(ch))
+                return dict(ch)
         except Exception as e:
             # IMPORTANT: if the bot itself isn't an admin in this channel
             # (or the channel ID is wrong), get_chat_member() always throws
@@ -3032,6 +3046,12 @@ async def inspect_compulsory_memberships(user_id: int) -> list:
                 f"user={user_id}: {e} — skipping this channel's check "
                 f"(bot may not be admin there)."
             )
+        return None
+
+    results = await asyncio.gather(*[_check(ch) for ch in real_channels])
+    unjoined = [r for r in results if r is not None]
+    if not unjoined:
+        _gate_ok_cache[user_id] = time.monotonic() + _GATE_OK_TTL
     return unjoined
 
 async def enforce_membership_gate(event, user_id: int) -> bool:
