@@ -1,13 +1,11 @@
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { api, API_BASE, initData, tg, type Me } from "./api";
 import Home from "./screens/Home";
 import Tasks from "./screens/Tasks";
 import Invite from "./screens/Invite";
 import Top from "./screens/Top";
 import Withdraw from "./screens/Withdraw";
-// Admin is the heaviest screen (542 lines) and only the owner uses it —
-// lazy-load it so regular users never download its code (2026-11-26 scale pass).
-const Admin = lazy(() => import("./screens/Admin"));
+import Admin from "./screens/Admin";
 
 export type Tab = "home" | "tasks" | "invite" | "top" | "withdraw" | "admin";
 
@@ -226,7 +224,7 @@ export default function App() {
             {tab === "invite" && <Invite />}
             {tab === "top" && <Top />}
             {tab === "withdraw" && <Withdraw />}
-            {tab === "admin" && me?.is_admin && (<Suspense fallback={<div className="card" style={{ marginTop: 18 }}>Loading admin…</div>}><Admin /></Suspense>)}
+            {tab === "admin" && me?.is_admin && <Admin />}
           </div>
         )}
       </main>
