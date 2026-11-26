@@ -381,6 +381,14 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('ads_enabled', '0');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('daily_checkin_require_ad', '0');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('ads_maintenance', '1');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('adsgram_block_id', '');
+-- Weekly Top 20 rewards (owner request 2026-11-26): every week the 20
+-- users with the most PAID referrals that week split a prize pool by
+-- rank percentages; the split is automatic (weekly_top_payout_loop).
+-- Pool + percents are admin-editable from the Mini App Admin panel.
+INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_enabled', '1');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_pool', '500');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_percents', '[22,15,11,8,6,5,4.5,4,3.5,3,2.8,2.5,2.3,2,1.9,1.7,1.5,1.3,1.1,0.9]');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_last_paid', '');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('monetag_zone_id', '');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('monetag_sdk_url', '');
 -- Tads — second/gating rewarded ad shown right after AdsGram's video ad
@@ -541,6 +549,19 @@ MIGRATION_STATEMENTS = [
         full_name TEXT,
         username  TEXT,
         refs      INTEGER DEFAULT 0
+    )""",
+    # Weekly Top 20 prize payouts — one row per winner per week; the
+    # UNIQUE(week_id, user_id) makes the automatic weekly payout
+    # idempotent (a restart mid-payout can never double-pay).
+    """CREATE TABLE IF NOT EXISTS weekly_top_payouts (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
+        week_id  TEXT NOT NULL,
+        user_id  INTEGER NOT NULL,
+        rank     INTEGER NOT NULL,
+        refs     INTEGER NOT NULL,
+        amount   REAL NOT NULL,
+        paid_at  TEXT DEFAULT (datetime('now')),
+        UNIQUE(week_id, user_id)
     )""",
     # Reconciles AdsGram's S2S postback with Tads's client-reported
     # outcome, whichever of the two arrives first — see
@@ -809,6 +830,129 @@ class DataEngine:
             rows = await cur.fetchall()
             return [{"user_id": r[0], "full_name": r[1], "username": r[2], "refs": r[3]}
                     for r in rows]
+
+    # ── Weekly Top 20 rewards ─────────────────────────────────────────
+    # A "week" runs Monday 00:00 UTC → next Monday 00:00 UTC. Ranking
+    # counts invitees with referral_paid = 1 whose joined_at (their
+    # verification moment) falls inside the week.
+
+    @staticmethod
+    def week_bounds(when: datetime | None = None):
+        """(start, end, week_id) for the week containing `when` (UTC)."""
+        now = when or datetime.utcnow()
+        monday = (now - timedelta(days=now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0)
+        end = monday + timedelta(days=7)
+        iso = monday.isocalendar()
+        return monday, end, f"{iso[0]}-W{iso[1]:02d}"
+
+    @staticmethod
+    async def weekly_top_config():
+        enabled = (await DataEngine.get_setting("weekly_top_enabled", "1")) == "1"
+        try:
+            pool = float(await DataEngine.get_setting("weekly_top_pool", "500"))
+            if not math.isfinite(pool) or pool < 0:
+                pool = 0.0
+        except (TypeError, ValueError):
+            pool = 0.0
+        percents = [22, 15, 11, 8, 6, 5, 4.5, 4, 3.5, 3,
+                    2.8, 2.5, 2.3, 2, 1.9, 1.7, 1.5, 1.3, 1.1, 0.9]
+        raw = await DataEngine.get_setting("weekly_top_percents", "")
+        if raw:
+            try:
+                parsed = [float(x) for x in json.loads(raw)]
+                if len(parsed) == 20 and all(math.isfinite(x) and x >= 0 for x in parsed):
+                    percents = parsed
+            except Exception:
+                pass
+        return {"enabled": enabled, "pool": pool, "percents": percents}
+
+    @staticmethod
+    def prize_for_rank(rank: int, pool: float, percents: list) -> float:
+        if 1 <= rank <= len(percents):
+            return round(pool * percents[rank - 1] / 100.0, 2)
+        return 0.0
+
+    @staticmethod
+    async def get_weekly_top(start: datetime, end: datetime, limit: int = 20):
+        """Top referrers by PAID referrals inside [start, end).
+        Banned referrers excluded; test/demo referrers (negative IDs)
+        stay visible on the board but are filtered out at payout."""
+        async with aiosqlite.connect(DB_PATH) as db:
+            cur = await db.execute(
+                "SELECT r.referred_by, u.full_name, u.username, COUNT(*) AS refs "
+                "FROM users r JOIN users u ON u.user_id = r.referred_by "
+                "WHERE r.referred_by IS NOT NULL AND r.referral_paid = 1 "
+                "AND r.joined_at >= ? AND r.joined_at < ? "
+                "AND COALESCE(u.is_banned, 0) = 0 "
+                "GROUP BY r.referred_by ORDER BY refs DESC, u.joined_at ASC LIMIT ?",
+                (start.strftime("%Y-%m-%d %H:%M:%S"),
+                 end.strftime("%Y-%m-%d %H:%M:%S"), limit))
+            rows = await cur.fetchall()
+            return [{"user_id": r[0], "full_name": r[1], "username": r[2], "refs": r[3]}
+                    for r in rows]
+
+    @staticmethod
+    async def get_weekly_user_rank(user_id: int, start: datetime, end: datetime):
+        """(refs, rank) for one user in the week; rank is None when 0."""
+        async with aiosqlite.connect(DB_PATH) as db:
+            cur = await db.execute(
+                "SELECT COUNT(*) FROM users WHERE referred_by = ? "
+                "AND referral_paid = 1 AND joined_at >= ? AND joined_at < ?",
+                (user_id, start.strftime("%Y-%m-%d %H:%M:%S"),
+                 end.strftime("%Y-%m-%d %H:%M:%S")))
+            refs = (await cur.fetchone())[0] or 0
+            if refs == 0:
+                return 0, None
+            cur = await db.execute(
+                "SELECT COUNT(*) FROM (SELECT r.referred_by, COUNT(*) AS c "
+                "FROM users r JOIN users u ON u.user_id = r.referred_by "
+                "WHERE r.referred_by IS NOT NULL AND r.referral_paid = 1 "
+                "AND r.joined_at >= ? AND r.joined_at < ? "
+                "AND COALESCE(u.is_banned, 0) = 0 GROUP BY r.referred_by) "
+                "WHERE c > ?",
+                (start.strftime("%Y-%m-%d %H:%M:%S"),
+                 end.strftime("%Y-%m-%d %H:%M:%S"), refs))
+            return refs, (await cur.fetchone())[0] + 1
+
+    @staticmethod
+    async def pay_weekly_top_if_due() -> str:
+        """Pay the PREVIOUS week's Top 20 once, automatically. Returns
+        a short status string. Idempotent: weekly_top_last_paid marks
+        the week, and weekly_top_payouts has UNIQUE(week_id, user_id).
+        Test/demo referrers (user_id <= 0) never receive real money,
+        but they keep their rank slot (their prize is simply not paid)."""
+        cfg = await DataEngine.weekly_top_config()
+        _start, _end, prev_id = DataEngine.week_bounds(
+            datetime.utcnow() - timedelta(days=7))
+        last = await DataEngine.get_setting("weekly_top_last_paid", "")
+        if last == prev_id:
+            return "already_paid"
+        if not cfg["enabled"] or cfg["pool"] <= 0:
+            await DataEngine.set_setting("weekly_top_last_paid", prev_id)
+            return "skipped_disabled"
+        prev_start, prev_end, _ = DataEngine.week_bounds(
+            datetime.utcnow() - timedelta(days=7))
+        rows = await DataEngine.get_weekly_top(prev_start, prev_end, 20)
+        paid = 0
+        for i, r in enumerate(rows):
+            rank = i + 1
+            prize = DataEngine.prize_for_rank(rank, cfg["pool"], cfg["percents"])
+            if prize <= 0 or r["user_id"] <= 0:
+                continue
+            async with aiosqlite.connect(DB_PATH) as db:
+                cur = await db.execute(
+                    "INSERT OR IGNORE INTO weekly_top_payouts "
+                    "(week_id, user_id, rank, refs, amount) VALUES (?,?,?,?,?)",
+                    (prev_id, r["user_id"], rank, r["refs"], prize))
+                await db.commit()
+                claimed = cur.rowcount > 0
+            if claimed:
+                await DataEngine.add_balance(r["user_id"], prize)
+                paid += 1
+        await DataEngine.set_setting("weekly_top_last_paid", prev_id)
+        logger.info(f"Weekly Top payout for {prev_id}: {paid} winners paid")
+        return f"paid_{paid}"
 
     @staticmethod
     async def get_referral_metrics(user_id: int):
@@ -5537,33 +5681,47 @@ async def api_me(body: ApiBase):
     }
 
 
-# ── /api/leaderboard — Top Referrers, served from the 12-hour snapshot ──
+# ── /api/leaderboard — WEEKLY Top 20 with prize split (owner request
+# 2026-11-26). The board ranks this week's paid referrals; each rank
+# shows the prize it will win from the weekly pool (pool × rank %).
+# Prizes are credited automatically when the week ends.
 @api_app.post("/api/leaderboard")
 async def api_leaderboard(body: ApiBase):
     user = await _authenticate(body)
     uid = user["user_id"]
-    rows = await DataEngine.get_leaderboard_rows()
-    rate = float(await DataEngine.get_setting("reward_per_referral", "10"))
-    updated_at = await DataEngine.get_setting("leaderboard_updated_at", "") or ""
+    cfg = await DataEngine.weekly_top_config()
+    start, end, week_id = DataEngine.week_bounds()
+    rows = await DataEngine.get_weekly_top(start, end, 20)
 
     def pub(i, r):
+        rank = i + 1
         return {
-            "rank": i + 1,
+            "rank": rank,
             "name": r["full_name"] or (("@" + r["username"]) if r["username"] else "User"),
             "refs": r["refs"],
-            "earned": round(r["refs"] * rate, 2),
+            "pct": cfg["percents"][rank - 1] if rank <= len(cfg["percents"]) else 0,
+            "prize": DataEngine.prize_for_rank(rank, cfg["pool"], cfg["percents"]),
             "is_me": r["user_id"] == uid,
         }
 
-    top = [pub(i, r) for i, r in enumerate(rows[:10])]
+    top = [pub(i, r) for i, r in enumerate(rows)]
     my_idx = next((i for i, r in enumerate(rows) if r["user_id"] == uid), None)
     if my_idx is not None:
         mine = {"rank": my_idx + 1, "refs": rows[my_idx]["refs"],
-                "earned": round(rows[my_idx]["refs"] * rate, 2)}
+                "prize": DataEngine.prize_for_rank(my_idx + 1, cfg["pool"], cfg["percents"])}
     else:
-        direct, _t2 = await DataEngine.get_paid_referral_metrics(uid)
-        mine = {"rank": None, "refs": direct, "earned": round(direct * rate, 2)}
-    return {"updated_at": updated_at, "top": top, "me": mine}
+        refs, rank = await DataEngine.get_weekly_user_rank(uid, start, end)
+        mine = {"rank": rank, "refs": refs,
+                "prize": DataEngine.prize_for_rank(rank, cfg["pool"], cfg["percents"]) if rank else 0}
+    seconds_left = max(0, int((end - datetime.utcnow()).total_seconds()))
+    return {
+        "weekly": {
+            "enabled": cfg["enabled"], "pool": cfg["pool"], "week_id": week_id,
+            "ends_at": end.strftime("%Y-%m-%dT%H:%M:%SZ"), "seconds_left": seconds_left,
+        },
+        "updated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "top": top, "me": mine,
+    }
 
 
 @api_app.post("/api/admin/leaderboard/seed_test")
@@ -5598,6 +5756,41 @@ async def api_admin_rotate_secrets(body: ApiBase):
     await DataEngine.set_setting("tads_webhook_secret", secrets.token_urlsafe(32))
     _adsgram_secret_cache = None
     _tads_webhook_secret_cache = None
+    return {"ok": True}
+
+
+@api_app.post("/api/admin/weekly_top")
+async def api_admin_weekly_top(body: ApiBase):
+    user = await _authenticate(body)
+    _require_admin(user)
+    cfg = await DataEngine.weekly_top_config()
+    return {
+        "enabled": cfg["enabled"], "pool": cfg["pool"], "percents": cfg["percents"],
+        "last_paid": await DataEngine.get_setting("weekly_top_last_paid", ""),
+    }
+
+
+class AdminWeeklyTopSave(ApiBase):
+    pool: float
+    percents: list[float]
+    enabled: bool = True
+
+
+@api_app.post("/api/admin/weekly_top/save")
+async def api_admin_weekly_top_save(body: AdminWeeklyTopSave):
+    user = await _authenticate(body)
+    _require_admin(user)
+    if not math.isfinite(body.pool) or body.pool < 0:
+        raise HTTPException(400, "Pool must be 0 or more")
+    if len(body.percents) != 20 or any(
+            not math.isfinite(p) or p < 0 or p > 100 for p in body.percents):
+        raise HTTPException(400, "Exactly 20 percentages (0-100) are required")
+    total = sum(body.percents)
+    if abs(total - 100) > 0.51:
+        raise HTTPException(400, f"Percentages must add up to 100 (now {total:.1f})")
+    await DataEngine.set_setting("weekly_top_pool", str(body.pool))
+    await DataEngine.set_setting("weekly_top_percents", json.dumps(body.percents))
+    await DataEngine.set_setting("weekly_top_enabled", "1" if body.enabled else "0")
     return {"ok": True}
 
 
@@ -7407,6 +7600,17 @@ async def send_db_backup():
         logger.warning(f"DB backup failed: {e}")
 
 
+async def weekly_top_payout_loop():
+    # Weekly Top 20 prizes: check at startup and then hourly; the
+    # payout itself is idempotent, so overlapping checks are harmless.
+    while True:
+        try:
+            await DataEngine.pay_weekly_top_if_due()
+        except Exception as e:
+            logger.warning(f"Weekly Top payout check failed: {e}")
+        await asyncio.sleep(3600)
+
+
 async def db_backup_loop():
     # Send one right away at startup so there's always a fresh copy, then
     # repeat on the configured interval for as long as the process runs.
@@ -7478,6 +7682,7 @@ async def _main():
     asyncio.create_task(db_backup_loop())
     asyncio.create_task(notify_ad_limit_reset_loop())
     asyncio.create_task(leaderboard_refresh_loop())
+    asyncio.create_task(weekly_top_payout_loop())
     await _run_web_server()
 
 
