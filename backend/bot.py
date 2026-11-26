@@ -5294,7 +5294,9 @@ api_app = FastAPI()
 
 api_app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ALLOWED_ORIGIN] if ALLOWED_ORIGIN else ["*"],
+    # ALLOWED_ORIGIN may hold a comma-separated list (e.g. the current and
+    # previous frontend domains during a rename) — allow each of them.
+    allow_origins=[o.strip() for o in ALLOWED_ORIGIN.split(",") if o.strip()] or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
