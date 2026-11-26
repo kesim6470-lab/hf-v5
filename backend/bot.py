@@ -6590,6 +6590,19 @@ async def _force_membership_ok(task, uid) -> str:
         return "ok"
     ref = (task["channel_id"] or "").strip()
     if not ref:
+        # Tasks created from the Mini App Admin before the channel-field
+        # fix stored NO channel_id (the form never sent one), so every
+        # check failed closed forever. Fall back to the invite link:
+        # a public t.me/<name> link still identifies the channel.
+        link = (task["invite_link"] or "").strip()
+        for p in ("https://t.me/", "http://t.me/", "t.me/"):
+            if link.startswith(p):
+                link = link[len(p):]
+                break
+        link = link.strip("/").split("/")[0].split("?")[0]
+        if link and not link.startswith("+"):
+            ref = link if (link.startswith("@") or link.lstrip("-").isdigit()) else f"@{link}"
+    if not ref:
         return "check_failed"
     m = None
     try:
@@ -7074,12 +7087,36 @@ async def api_admin_tasks_create(body: AdminTaskCreateRequest):
     if not body.title.strip():
         raise HTTPException(status_code=400, detail="title_required")
     _ch = body.channel_id.strip()
-    if body.task_type == "force" and _ch:
+    if body.task_type == "force":
+        # A force task is only real if the bot can look members up in
+        # the channel. Resolve the ref from channel_id, else from the
+        # invite link, normalize it to the numeric chat id, and prove
+        # the bot is admin/creator there — otherwise refuse to create
+        # a task whose check could never pass (the old code silently
+        # stored an empty/unresolvable ref and every check failed).
+        ref = _ch
+        if not ref:
+            link = body.invite_link.strip()
+            for p in ("https://t.me/", "http://t.me/", "t.me/"):
+                if link.startswith(p):
+                    link = link[len(p):]
+                    break
+            link = link.strip("/").split("/")[0].split("?")[0]
+            if link and not link.startswith("+"):
+                ref = link if (link.startswith("@") or link.lstrip("-").isdigit()) else f"@{link}"
+        if not ref:
+            raise HTTPException(status_code=400, detail="force_needs_channel")
         try:
-            _chat = await bot.get_chat(chat_id=_ch)
+            _chat = await bot.get_chat(chat_id=ref)
             _ch = str(_chat.id)
+            _bot_id = BOT_ID or (await bot.get_me()).id
+            _me = await bot.get_chat_member(chat_id=_ch, user_id=_bot_id)
+            if _me.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
+                raise HTTPException(status_code=400, detail="bot_not_admin_in_channel")
+        except HTTPException:
+            raise
         except Exception:
-            pass
+            raise HTTPException(status_code=400, detail="bot_not_admin_in_channel")
     task_id = await DataEngine.create_task(
         body.title.strip(), _ch, body.invite_link.strip(),
         body.task_type, body.reward,
