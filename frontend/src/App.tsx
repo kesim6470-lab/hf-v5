@@ -1,11 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { api, API_BASE, initData, tg, type Me } from "./api";
 import Home from "./screens/Home";
 import Tasks from "./screens/Tasks";
 import Invite from "./screens/Invite";
 import Top from "./screens/Top";
 import Withdraw from "./screens/Withdraw";
-import Admin from "./screens/Admin";
+// Admin is the heaviest screen (542 lines) and only the owner uses it —
+// lazy-load it so regular users never download its code (2026-11-26 scale pass).
+const Admin = lazy(() => import("./screens/Admin"));
 
 export type Tab = "home" | "tasks" | "invite" | "top" | "withdraw" | "admin";
 
@@ -90,20 +92,46 @@ export default function App() {
 
   const go = useCallback((t: Tab) => { setTab(t); window.scrollTo(0, 0); }, []);
 
+  // Sliding nav pill (MyAge-style animation, user 2026-11-26): one pill
+  // element glides to whichever tab is active with a springy ease.
+  const navRef = useRef<HTMLElement | null>(null);
+  const [pill, setPill] = useState({ x: 0, w: 0, ready: false });
+
   const user = tg?.initDataUnsafe?.user;
-  const tabs: { id: Tab; icon: string; label: string; show: boolean }[] = [
-    { id: "home", icon: "🏠", label: "Home", show: true },
-    { id: "tasks", icon: "🎯", label: "Tasks", show: true },
-    { id: "invite", icon: "🔗", label: "Invite", show: true },
-    { id: "top", icon: "🏆", label: "Top", show: true },
-    { id: "withdraw", icon: "💸", label: "Withdraw", show: true },
-    { id: "admin", icon: "⚙️", label: "Admin", show: !!me?.is_admin },
+  // Bottom-nav icons: flat filled glyphs (MyAge-style, user screenshot
+  // 2026-11-26) tinted by currentColor — blue on the active tab, plain on the
+  // rest. Emoji cannot be tinted, so these are inline SVGs.
+  const ni = (d: string) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={d} /></svg>
+  );
+  const tabs: { id: Tab; icon: ReactNode; label: string; show: boolean }[] = [
+    { id: "home", icon: ni("M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"), label: "Home", show: true },
+    { id: "tasks", icon: ni("M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"), label: "Tasks", show: true },
+    { id: "invite", icon: ni("M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"), label: "Invite", show: true },
+    { id: "top", icon: ni("M19 5h-2V3H7v2H5a2 2 0 0 0-2 2v1a5 5 0 0 0 5 5 5 5 0 0 0 3 3.58V19H7v2h10v-2h-4v-3.42A5 5 0 0 0 16 13a5 5 0 0 0 5-5V7a2 2 0 0 0-2-2zM5 8V7h2v3.82C5.84 10.44 5 9.3 5 8zm14 0c0 1.3-.84 2.44-2 2.82V7h2v1z"), label: "Top", show: true },
+    { id: "withdraw", icon: ni("M21 7.28V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2.28A2 2 0 0 0 22 15V9a2 2 0 0 0-1-1.72zM5 5h14v2H5a2 2 0 0 1 0-2zm13 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"), label: "Withdraw", show: true },
+    { id: "admin", icon: ni("M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"), label: "Admin", show: !!me?.is_admin },
   ];
+  const visibleTabs = tabs.filter((t) => t.show);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const nav = navRef.current;
+      if (!nav) return;
+      const btn = nav.querySelector<HTMLElement>(`button[data-tab="${tab}"]`);
+      if (btn) setPill({ x: btn.offsetLeft + 3, w: btn.offsetWidth - 6, ready: true });
+    };
+    measure();
+    const t1 = setTimeout(measure, 120);
+    const t2 = setTimeout(measure, 500);
+    window.addEventListener("resize", measure);
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener("resize", measure); };
+  }, [tab, visibleTabs.length]);
 
   if (!booted) {
     return (
       <div className="splash">
-        <img className="splash-logo" src="/logo.png" alt="Anon Earn" />
+        <img className="splash-logo" src="/logo.jpg" alt="Anon Earn" />
         <div className="splash-name">Anon Earn</div>
         <div className="splash-bar"><div className="splash-fill" /></div>
         <div className="splash-sub">Loading your account…</div>
@@ -192,21 +220,22 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <div className="app-enter">
+          <div className="app-enter" key={tab}>
             {tab === "home" && <Home />}
             {tab === "tasks" && <Tasks />}
             {tab === "invite" && <Invite />}
             {tab === "top" && <Top />}
             {tab === "withdraw" && <Withdraw />}
-            {tab === "admin" && me?.is_admin && <Admin />}
+            {tab === "admin" && me?.is_admin && (<Suspense fallback={<div className="card" style={{ marginTop: 18 }}>Loading admin…</div>}><Admin /></Suspense>)}
           </div>
         )}
       </main>
 
       {!(forceUnjoined && forceUnjoined.length > 0 && !gateError) && (
-      <nav>
-        {tabs.filter((t) => t.show).map((t) => (
-          <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => go(t.id)}>
+      <nav ref={navRef}>
+        <span className="nav-pill" style={{ transform: `translateX(${pill.x}px)`, width: pill.w, opacity: pill.ready ? 1 : 0 }} />
+        {visibleTabs.map((t) => (
+          <button key={t.id} data-tab={t.id} className={tab === t.id ? "active" : ""} onClick={() => go(t.id)}>
             <span className="ni">{t.icon}</span>{t.label}
           </button>
         ))}
