@@ -97,7 +97,7 @@ function Overview() {
       <div className="card" style={{ marginTop: 14 }}>
         <div style={{ fontWeight: 800, marginBottom: 6 }}>🏆 Top Referrers — test data</div>
         <div className="s" style={{ color: "var(--muted)", fontSize: 12 }}>
-          Adds sample names (dawit T, Mule Mosisa, Tame, wildflower, Suru, Unfair World, Kasahun, Cr 7) to the Top board so you can preview it. Remove them before real users arrive.
+          Adds sample names (Samira, dawit T, Abdi, Mule Mosisa, Yoni, Tame, wildflower, Bura, Suru, Da, Unfair World, Muaze, Kasahun, Nati, Cr 7) to the Top board so you can preview it. Remove them before real users arrive.
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Btn className="btn gold" style={{ flex: 1 }} onClick={seedTest}>🧪 Add test names</Btn>
