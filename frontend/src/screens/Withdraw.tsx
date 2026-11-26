@@ -20,18 +20,12 @@ export const BinanceIcon = () => (
   </svg>
 );
 export const TelebirrIcon = () => (
-  <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true">
-    <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="#FFFFFF" stroke="#E2E8F0" />
-    <g fill="#1596D6">
-      {/* top flag: stem top flaring right into a curved boot */}
-      <path d="M16.5 5.5 L16.5 11.8 C16.5 14.3 18 15.5 20.8 15.5 L25.8 15.5 C23.2 12.8 21.8 9.2 21.3 5.5 Z" />
-      {/* left funnel wedge pointing right */}
-      <path d="M6.5 13.2 C10 14.8 12.8 15.8 15.2 16.6 C12.8 17.4 10 18.6 6.5 19.8 C7.8 17.6 7.8 15.4 6.5 13.2 Z" />
-    </g>
-    {/* stem descending into the swirl */}
-    <path d="M18.9 11.5 L18.9 18.6 C15 19.4 13 21.9 13.7 24.9 C14.4 28 17.9 29.2 20.7 28.1 C23.3 27.1 24.3 24.3 23.2 22.1 C22.3 20.3 20.1 19.7 18.8 20.9"
-      fill="none" stroke="#1596D6" stroke-width="2.9" stroke-linecap="round" />
-  </svg>
+  // The REAL telebirr glyph — Ethio telecom's official app-icon artwork
+  // (from the Google Play listing), shipped as /telebirr.png. Hand-drawn
+  // SVG approximations were rejected by the owner twice (2026-11-26), so
+  // the genuine asset is used instead.
+  <img src="/telebirr.png" alt="Telebirr" width={22} height={22}
+    style={{ borderRadius: 6, background: "#fff", flex: "none" }} />
 );
 
 /** Withdraw (💸 — the user's naming, not "Wallet"): Telebirr or Binance
