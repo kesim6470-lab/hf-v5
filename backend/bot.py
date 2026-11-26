@@ -669,6 +669,24 @@ class DataEngine:
             return await cur.fetchone()
 
     @staticmethod
+    async def find_users_by_name(q: str, limit: int = 20):
+        """Admin user lookup by display name or username (the Users tab
+        search used to accept numeric IDs only, so an admin who saw a
+        name on the Top board could not find its ID — owner request
+        2026-11-26). LIKE wildcards in q are escaped; SQLite LIKE is
+        case-insensitive for ASCII."""
+        esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT user_id, username, full_name, balance, "
+                "COALESCE(is_banned, 0) AS is_banned FROM users "
+                "WHERE full_name LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\' "
+                "ORDER BY user_id DESC LIMIT ?",
+                (f"%{esc}%", f"%{esc}%", limit))
+            return await cur.fetchall()
+
+    @staticmethod
     async def create_user(user_id: int, username: str, full_name: str, referred_by: int = None):
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
@@ -7389,6 +7407,25 @@ async def api_admin_users_search(body: AdminUserIdRequest):
         "referrals": direct,
         "is_banned": bool(target["is_banned"]),
     }
+
+
+class AdminUserFindRequest(ApiBase):
+    q: str
+
+
+@api_app.post("/api/admin/users/find")
+async def api_admin_users_find(body: AdminUserFindRequest):
+    user = await _authenticate(body)
+    _require_admin(user)
+    q = (body.q or "").strip()
+    if len(q) < 2:
+        raise HTTPException(status_code=400, detail="query_too_short")
+    rows = await DataEngine.find_users_by_name(q)
+    return {"matches": [{
+        "user_id": r["user_id"], "username": r["username"],
+        "full_name": r["full_name"], "balance": float(r["balance"]),
+        "is_banned": bool(r["is_banned"]),
+    } for r in rows]}
 
 
 class AdminUserBanRequest(ApiBase):
