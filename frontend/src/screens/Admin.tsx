@@ -3,6 +3,19 @@ import { api, fmt, type Task, type Withdrawal } from "../api";
 import { useApp } from "../App";
 import { Btn, Shimmer } from "../components/ui";
 
+// Telegram's webview never displays native window.confirm() — it silently
+// returns false, which made the Remove / Rotate secrets / Delete task /
+// Broadcast buttons look dead (bug found 2026-11-26: 🧹 Remove did nothing).
+// Two-tap confirm instead: first tap arms and shows a toast, a second tap
+// within 4 seconds proceeds.
+const _armedConfirms = new Map<string, number>();
+function tapConfirm(key: string): boolean {
+  const now = Date.now();
+  if (now - (_armedConfirms.get(key) || 0) < 4000) { _armedConfirms.delete(key); return true; }
+  _armedConfirms.set(key, now);
+  return false;
+}
+
 type Sub = "overview" | "withdrawals" | "tasks" | "users" | "channels" | "ads" | "settings" | "broadcast";
 
 const SUBS: { id: Sub; label: string }[] = [
@@ -66,12 +79,12 @@ function Overview() {
     catch (e: any) { toast(e?.message || "Failed"); }
   }
   async function clearTest() {
-    if (!window.confirm("Remove the test leaderboard names?")) return;
+    if (!tapConfirm("clearTest")) { toast("⚠️ Tap 🧹 Remove again to confirm"); return; }
     try { await api("/api/admin/leaderboard/clear_test"); toast("🧹 Test leaderboard removed"); }
     catch (e: any) { toast(e?.message || "Failed"); }
   }
   async function rotateSecrets() {
-    if (!window.confirm("Generate NEW webhook secrets? The webhook URLs in the ad dashboards must be updated to match.")) return;
+    if (!tapConfirm("rotateSecrets")) { toast("⚠️ Tap 🔐 Rotate again to confirm — webhook URLs in the ad dashboards must be updated after"); return; }
     try {
       const r = await api<{ ok: boolean; reason?: string }>("/api/admin/security/rotate_secrets");
       toast(r.ok ? "🔐 Secrets rotated" : r.reason === "env_override" ? "⚠️ Env vars override — change them on Railway" : "Failed");
@@ -232,7 +245,7 @@ function AdminTasks() {
     load();
   }
   async function del(t: Task) {
-    if (!window.confirm(`Delete task "${t.title}"?`)) return;
+    if (!tapConfirm("deltask" + t.id)) { toast(`⚠️ Tap delete again to confirm: "${t.title}"`); return; }
     try { await api("/api/admin/tasks/delete", { id: t.id }); toast("🗑 Deleted"); }
     catch (e: any) { toast(e?.message || "Delete failed"); }
     load();
@@ -539,7 +552,7 @@ function AdminBroadcast() {
   const [busy, setBusy] = useState(false);
   async function send() {
     if (!text.trim()) return toast("Enter a message");
-    if (!window.confirm("Send this broadcast to ALL users?")) return;
+    if (!tapConfirm("broadcast")) return toast("⚠️ Tap Send again to confirm — this goes to ALL users");
     setBusy(true);
     try {
       const r = await api<{ sent: number; failed: number }>("/api/admin/broadcast", { text });
