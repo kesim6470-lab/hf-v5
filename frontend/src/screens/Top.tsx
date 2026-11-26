@@ -31,7 +31,7 @@ export default function Top() {
 
   const prizeTag = (r: LeaderboardEntry, big = false) => (
     <span className="prize" style={big ? { fontSize: 16, padding: "6px 16px" } : undefined}>
-      🎁 {fmt(r.prize)} Birr <small>· {r.pct}%</small>
+      {fmt(r.prize)} Birr
     </span>
   );
 
