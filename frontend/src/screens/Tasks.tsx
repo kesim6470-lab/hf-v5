@@ -38,7 +38,17 @@ export default function Tasks() {
     setBusy(t.id);
     try {
       await api("/api/tasks/join", { task_id: t.id });
-      if (t.invite_link) { if (tg?.openLink) tg.openLink(t.invite_link); else window.open(t.invite_link, "_blank"); }
+      if (t.invite_link) {
+        // t.me links MUST go through openTelegramLink — openLink hands
+        // them to an external browser and the button looks dead inside
+        // Telegram (owner report 2026-11-26). Same rule as the App gate.
+        let link = t.invite_link.trim();
+        if (link.startsWith("@")) link = "https://t.me/" + link.slice(1);
+        else if (link.startsWith("t.me/")) link = "https://" + link;
+        if (link.startsWith("https://t.me/") && tg?.openTelegramLink) tg.openTelegramLink(link);
+        else if (tg?.openLink) tg.openLink(link);
+        else window.open(link, "_blank");
+      }
       toast("⏳ Joined — wait a few seconds, then Check");
       setTimeout(load, 6000);
     } catch (e: any) { toast(e?.message || "Join failed"); }
