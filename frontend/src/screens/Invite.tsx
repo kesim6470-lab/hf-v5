@@ -63,7 +63,7 @@ export default function Invite() {
         </div>
       </div>
       <Btn className="btn" style={{ marginTop: 14, width: "100%" }} onClick={inviteFriends}>
-        📤 Invite Friends — Pick a Chat
+        📤 Invite Friends
       </Btn>
       <div className="empty" style={{ marginTop: 8 }}>
         Pick a friend or group, then tap the Anon Earn card to send it there.

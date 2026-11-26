@@ -476,6 +476,8 @@ function AdminSettings() {
     <div className="card">
       {num("reward_per_referral", "Reward per referral (Birr)")}
       {num("min_withdrawal", "Minimum withdrawal (Birr)")}
+      {bool("withdraw_telebirr_enabled", "Telebirr withdrawals")}
+      {bool("withdraw_binance_enabled", "Binance Pay withdrawals")}
       {num("min_ads_for_withdrawal", "Min ads before withdrawal", "1")}
       {num("usdt_rate", "USDT rate (Birr)")}
       {txt("support_username", "Support username")}
