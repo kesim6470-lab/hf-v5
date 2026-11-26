@@ -44,14 +44,38 @@ export default function Admin() {
 }
 
 function Overview() {
+  const { toast } = useApp();
   const [stats, setStats] = useState<any>(null);
   useEffect(() => { api("/api/admin/stats/overview").then(setStats).catch(() => {}); }, []);
   if (!stats) return <div className="empty">Loading…</div>;
+
+  async function seedTest() {
+    try { await api("/api/admin/leaderboard/seed_test"); toast("🧪 Test leaderboard added — open the 🏆 Top tab"); }
+    catch (e: any) { toast(e?.message || "Failed"); }
+  }
+  async function clearTest() {
+    if (!window.confirm("Remove the test leaderboard names?")) return;
+    try { await api("/api/admin/leaderboard/clear_test"); toast("🧹 Test leaderboard removed"); }
+    catch (e: any) { toast(e?.message || "Failed"); }
+  }
+
   return (
-    <div className="stat-row" style={{ marginTop: 0 }}>
-      <div className="stat-box"><div className="n">{stats.total_users}</div><div className="l">Total users</div></div>
-      <div className="stat-box"><div className="n">{stats.online_users}</div><div className="l">Online (recent)</div></div>
-    </div>
+    <>
+      <div className="stat-row" style={{ marginTop: 0 }}>
+        <div className="stat-box"><div className="n">{stats.total_users}</div><div className="l">Total users</div></div>
+        <div className="stat-box"><div className="n">{stats.online_users}</div><div className="l">Online (recent)</div></div>
+      </div>
+      <div className="card" style={{ marginTop: 14 }}>
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>🏆 Top Referrers — test data</div>
+        <div className="s" style={{ color: "var(--muted)", fontSize: 12 }}>
+          Adds sample names (Samira, Abdi, Yoni, Bura, Da, Muaze, Nati) to the Top board so you can preview it. Remove them before real users arrive.
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button className="btn gold" style={{ flex: 1 }} onClick={seedTest}>🧪 Add test names</button>
+          <button className="btn ghost" style={{ flex: 1 }} onClick={clearTest}>🧹 Remove</button>
+        </div>
+      </div>
+    </>
   );
 }
 
