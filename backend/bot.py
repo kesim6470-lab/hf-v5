@@ -750,6 +750,40 @@ class DataEngine:
         await DataEngine.set_setting(
             "leaderboard_updated_at", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
 
+    # Test/demo data for the Top Referrers board (owner request
+    # 2026-11-26): seven sample referrers in a reserved ID range so
+    # they can be removed cleanly. NOT real users — every user_id >=
+    # TEST_ID_BASE belongs to this seed.
+    TEST_LEADERBOARD = [
+        ("Samira", 25), ("Abdi", 18), ("Yoni", 12), ("Bura", 9),
+        ("Da", 7), ("Muaze", 5), ("Nati", 3),
+    ]
+    TEST_ID_BASE = 990000000
+
+    @staticmethod
+    async def seed_test_leaderboard():
+        async with aiosqlite.connect(DB_PATH) as db:
+            invitee = DataEngine.TEST_ID_BASE + 100000
+            for i, (name, refs) in enumerate(DataEngine.TEST_LEADERBOARD):
+                rid = DataEngine.TEST_ID_BASE + i + 1
+                await db.execute(
+                    "INSERT OR IGNORE INTO users (user_id, username, full_name) VALUES (?,?,?)",
+                    (rid, name.lower() + "_test", name))
+                for _ in range(refs):
+                    invitee += 1
+                    await db.execute(
+                        "INSERT OR IGNORE INTO users (user_id, referred_by, referral_paid) VALUES (?,?,1)",
+                        (invitee, rid))
+            await db.commit()
+        await DataEngine.refresh_leaderboard()
+
+    @staticmethod
+    async def clear_test_leaderboard():
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("DELETE FROM users WHERE user_id >= ?", (DataEngine.TEST_ID_BASE,))
+            await db.commit()
+        await DataEngine.refresh_leaderboard()
+
     @staticmethod
     async def get_leaderboard_rows():
         async with aiosqlite.connect(DB_PATH) as db:
@@ -5466,6 +5500,22 @@ async def api_leaderboard(body: ApiBase):
         direct, _t2 = await DataEngine.get_paid_referral_metrics(uid)
         mine = {"rank": None, "refs": direct, "earned": round(direct * rate, 2)}
     return {"updated_at": updated_at, "top": top, "me": mine}
+
+
+@api_app.post("/api/admin/leaderboard/seed_test")
+async def api_admin_leaderboard_seed(body: ApiBase):
+    user = await _authenticate(body)
+    _require_admin(user)
+    await DataEngine.seed_test_leaderboard()
+    return {"ok": True}
+
+
+@api_app.post("/api/admin/leaderboard/clear_test")
+async def api_admin_leaderboard_clear(body: ApiBase):
+    user = await _authenticate(body)
+    _require_admin(user)
+    await DataEngine.clear_test_leaderboard()
+    return {"ok": True}
 
 
 # ── /api/invite/share_card — sends the user a ready-to-forward invite
