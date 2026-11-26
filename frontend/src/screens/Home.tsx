@@ -60,6 +60,7 @@ export default function Home() {
 
   async function watchAd() {
     if (!ads || busyAd) return;
+    if (ads.maintenance) return toast("🚧 Watch Ads is under maintenance — coming soon");
     if (!ads.block_id && !ads.monetag?.zone_id) return toast("❌ Ads not configured yet");
     setBusyAd(true);
     try { await api("/api/ads/click", { kind: "video" }); } catch { /* analytics only */ }
@@ -115,6 +116,29 @@ export default function Home() {
 
   async function checkIn() {
     if (!daily || busyCheckin || daily.claimed_today) return;
+    // No-ad mode (owner directive, until AdsGram is approved): the
+    // bonus claims directly — no arm, no ad, no S2S wait.
+    if (daily.ad_required === false) {
+      setBusyCheckin(true);
+      try {
+        const r = await api<{ reward: number; streak: number }>("/api/dailycheck/claim");
+        toast(`+${fmt(r.reward)} Birr — streak ${r.streak} 🔥`);
+        tg?.HapticFeedback?.notificationOccurred("success");
+        setDaily({ ...daily, claimed_today: true, streak: r.streak });
+        refreshMe();
+      } catch (e: any) {
+        if (e?.message === "already_claimed") {
+          setDaily({ ...daily, claimed_today: true });
+          toast("✅ You already checked in today — come back tomorrow!");
+        } else if (e?.message === "join_required") {
+          toast("🔒 Join the required channels first");
+        } else {
+          toast(e?.message || "Claim failed");
+        }
+      }
+      setBusyCheckin(false);
+      return;
+    }
     if (!ads?.block_id && !ads?.monetag?.zone_id) return toast("❌ Ads not configured yet");
     setBusyCheckin(true);
     try {
@@ -227,9 +251,9 @@ export default function Home() {
             <div className="tile c2">
               <div className="icon">🎬</div><div className="amt">+{fmt(ads?.reward_amount ?? 0.5)} Birr</div>
               <div className="name">Watch Ad</div>
-              <div className="sub">{ads ? `${ads.watched_today}/${ads.daily_limit} today${ads.seconds_left > 0 ? ` · wait ${ads.seconds_left}s` : ""}` : "…"}</div>
-              <button className="btn" disabled={!ads?.enabled || videoCapped || busyAd} onClick={watchAd}>
-                {busyAd ? "…" : videoCapped ? "Limit reached" : "Watch Ad"}
+              <div className="sub">{ads?.maintenance ? "Under maintenance 🔧" : ads ? `${ads.watched_today}/${ads.daily_limit} today${ads.seconds_left > 0 ? ` · wait ${ads.seconds_left}s` : ""}` : "…"}</div>
+              <button className="btn" disabled={!!ads?.maintenance || !ads?.enabled || videoCapped || busyAd} onClick={watchAd}>
+                {busyAd ? "…" : ads?.maintenance ? "🚧 Under Maintenance" : videoCapped ? "Limit reached" : "Watch Ad"}
               </button>
             </div>
           </div>

@@ -405,6 +405,7 @@ function AdminSettings() {
       {num("usdt_rate", "USDT rate (Birr)")}
       {txt("support_username", "Support username")}
       {bool("ads_enabled", "Ads master switch")}
+      {bool("ads_maintenance", "Watch Ads under maintenance")}
       {txt("adsgram_block_id", "AdsGram block ID")}
       {num("ad_reward_amount", "Ad reward (Birr)")}
       {num("ad_daily_limit", "Ad daily limit", "1")}
@@ -420,6 +421,7 @@ function AdminSettings() {
       {txt("tads_widget_id", "Tads widget ID")}
       {bool("user_task_creation_enabled", "User task creation")}
       {bool("daily_checkin_enabled", "Daily check-in")}
+      {bool("daily_checkin_require_ad", "Check-in requires ad view")}
       {num("daily_checkin_reward", "Daily check-in reward (Birr)")}
       {s.adsgram_s2s_secret && (
         <>
