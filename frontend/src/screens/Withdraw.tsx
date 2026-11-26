@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, fmt, type Withdrawal } from "../api";
 import { useApp } from "../App";
+import { Shimmer, Spinner } from "../components/ui";
 
 /** Withdraw (💸 — the user's naming, not "Wallet"): Telebirr or Binance
  *  Pay, min-withdrawal from /api/me, full history with status pills. */
@@ -23,7 +24,7 @@ export default function Withdraw() {
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
-  if (!me) return <div className="empty">Loading…</div>;
+  if (!me) return <Shimmer rows={2} />;
   const usdt = method === "binance" && Number(amount) > 0 ? Number(amount) / (me.usdt_rate || 155) : 0;
 
   async function submit() {
@@ -85,7 +86,7 @@ export default function Withdraw() {
             {usdt > 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>≈ {usdt.toFixed(2)} USDT at {fmt(me.usdt_rate)} Birr/USDT</div>}
           </>
         )}
-        <button className="btn" disabled={busy} onClick={submit}>{busy ? "…" : "💸 Submit withdrawal"}</button>
+        <button className="btn" disabled={busy} onClick={submit}>{busy ? <><Spinner />Sending…</> : "💸 Submit withdrawal"}</button>
       </div>
 
       <h3 className="sect">🧾 History</h3>

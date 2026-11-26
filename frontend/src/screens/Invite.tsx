@@ -1,5 +1,6 @@
 import { fmt, tg } from "../api";
 import { useApp } from "../App";
+import { Btn, Shimmer } from "../components/ui";
 
 /** Invite / Friends: referral stats, copyable link, and the Telegram
  *  invite-card picker.
@@ -16,7 +17,7 @@ import { useApp } from "../App";
  *  as plain text. */
 export default function Invite() {
   const { me, toast } = useApp();
-  if (!me) return <div className="empty">Loading…</div>;
+  if (!me) return <Shimmer rows={2} />;
 
   const referralLink = me.referral_link;
 
@@ -61,17 +62,17 @@ export default function Invite() {
           link and completes verification.
         </div>
       </div>
-      <button className="btn" style={{ marginTop: 14, width: "100%" }} onClick={inviteFriends}>
+      <Btn className="btn" style={{ marginTop: 14, width: "100%" }} onClick={inviteFriends}>
         📤 Invite Friends — Pick a Chat
-      </button>
+      </Btn>
       <div className="empty" style={{ marginTop: 8 }}>
         Pick a friend or group, then tap the Anon Earn card to send it there.
       </div>
       <h3 className="sect">🔗 Your Referral Link</h3>
       <div className="ref-box">{referralLink}</div>
-      <button className="btn ghost" onClick={() => { navigator.clipboard?.writeText(referralLink); toast("Link copied 📋"); }}>
+      <Btn className="btn ghost" onClick={() => { navigator.clipboard?.writeText(referralLink); toast("Link copied 📋"); }}>
         📋 Copy link
-      </button>
+      </Btn>
 
       {me.support_username && (
         <div className="empty">Need help? Contact @{me.support_username}</div>

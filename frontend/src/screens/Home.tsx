@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fmt, tg, type AdsStatus, type DailyStatus } from "../api";
 import { ensureMonetagSdk, showAdsgram, tryMonetagFallback } from "../ads";
 import { useApp } from "../App";
+import { Shimmer, Spinner } from "../components/ui";
 
 /** Home: glowing hero balance card, withdrawals ticker, Daily Check-in
  *  (🔥, arm → ad → S2S-confirmed claim), Watch & Earn (AdsGram video with
@@ -208,7 +209,7 @@ export default function Home() {
     setBusyDl(false);
   }
 
-  if (!me) return <div className="empty">Loading…</div>;
+  if (!me) return <Shimmer rows={3} />;
 
   const dl = ads?.direct_link;
   const videoCapped = ads ? ads.watched_today >= ads.daily_limit : false;
@@ -245,7 +246,7 @@ export default function Home() {
               <div className="name">Daily Check In</div>
               <div className="sub">Streak: {daily.streak} days 🔥</div>
               <button className="btn pulse" disabled={daily.claimed_today || busyCheckin} onClick={checkIn}>
-                {busyCheckin ? "…" : daily.claimed_today ? "✔ Done today" : "Check In"}
+                {busyCheckin ? <><Spinner />Checking…</> : daily.claimed_today ? "✔ Done today" : "Check In"}
               </button>
             </div>
             <div className="tile c2">
@@ -253,7 +254,7 @@ export default function Home() {
               <div className="name">Watch Ad</div>
               <div className="sub">{ads?.maintenance ? "Under maintenance 🔧" : ads ? `${ads.watched_today}/${ads.daily_limit} today${ads.seconds_left > 0 ? ` · wait ${ads.seconds_left}s` : ""}` : "…"}</div>
               <button className="btn" disabled={!!ads?.maintenance || !ads?.enabled || videoCapped || busyAd} onClick={watchAd}>
-                {busyAd ? "…" : ads?.maintenance ? "🚧 Under Maintenance" : videoCapped ? "Limit reached" : "Watch Ad"}
+                {busyAd ? <><Spinner />Loading ad…</> : ads?.maintenance ? "🚧 Under Maintenance" : videoCapped ? "Limit reached" : "Watch Ad"}
               </button>
             </div>
           </div>
@@ -270,7 +271,7 @@ export default function Home() {
               <div className="s">Earn {fmt(dl.reward_amount)} Birr per visit · {dl.watched_today}/{dl.daily_limit} today{dl.seconds_left > 0 ? ` · wait ${dl.seconds_left}s` : ""}</div>
             </div>
             <button className="btn sm" disabled={dlCapped || busyDl || dl.seconds_left > 0} onClick={directLink}>
-              {busyDl ? "…" : dlCapped ? "Done" : "Open"}
+              {busyDl ? <Spinner /> : dlCapped ? "Done" : "Open"}
             </button>
           </div>
         </>

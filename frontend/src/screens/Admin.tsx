@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, fmt, type Task, type Withdrawal } from "../api";
 import { useApp } from "../App";
+import { Btn, Shimmer } from "../components/ui";
 
 type Sub = "overview" | "withdrawals" | "tasks" | "users" | "channels" | "ads" | "settings" | "broadcast";
 
@@ -47,7 +48,7 @@ function Overview() {
   const { toast } = useApp();
   const [stats, setStats] = useState<any>(null);
   useEffect(() => { api("/api/admin/stats/overview").then(setStats).catch(() => {}); }, []);
-  if (!stats) return <div className="empty">Loading…</div>;
+  if (!stats) return <Shimmer rows={3} />;
 
   async function seedTest() {
     try { await api("/api/admin/leaderboard/seed_test"); toast("🧪 Test leaderboard added — open the 🏆 Top tab"); }
@@ -57,6 +58,29 @@ function Overview() {
     if (!window.confirm("Remove the test leaderboard names?")) return;
     try { await api("/api/admin/leaderboard/clear_test"); toast("🧹 Test leaderboard removed"); }
     catch (e: any) { toast(e?.message || "Failed"); }
+  }
+  async function rotateSecrets() {
+    if (!window.confirm("Generate NEW webhook secrets? The webhook URLs in the ad dashboards must be updated to match.")) return;
+    try {
+      const r = await api<{ ok: boolean; reason?: string }>("/api/admin/security/rotate_secrets");
+      toast(r.ok ? "🔐 Secrets rotated" : r.reason === "env_override" ? "⚠️ Env vars override — change them on Railway" : "Failed");
+    } catch (e: any) { toast(e?.message || "Failed"); }
+  }
+
+  // Weekly Top 20 reward config (pool + rank percentages)
+  const [wk, setWk] = useState<{ pool: number; percents: string; enabled: boolean; last_paid: string } | null>(null);
+  useEffect(() => {
+    api<any>("/api/admin/weekly_top").then((r) => setWk({
+      pool: r.pool, percents: r.percents.join(", "), enabled: r.enabled, last_paid: r.last_paid || "",
+    })).catch(() => {});
+  }, []);
+  async function saveWeekly() {
+    if (!wk) return;
+    const percents = wk.percents.split(",").map((x) => Number(x.trim())).filter((x) => !Number.isNaN(x));
+    try {
+      await api("/api/admin/weekly_top/save", { pool: Number(wk.pool), percents, enabled: wk.enabled });
+      toast("🏆 Weekly reward saved");
+    } catch (e: any) { toast(e?.message || "Failed — percentages must be 20 numbers adding to 100"); }
   }
 
   return (
@@ -71,9 +95,36 @@ function Overview() {
           Adds sample names (Samira, Abdi, Yoni, Bura, Da, Muaze, Nati) to the Top board so you can preview it. Remove them before real users arrive.
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button className="btn gold" style={{ flex: 1 }} onClick={seedTest}>🧪 Add test names</button>
-          <button className="btn ghost" style={{ flex: 1 }} onClick={clearTest}>🧹 Remove</button>
+          <Btn className="btn gold" style={{ flex: 1 }} onClick={seedTest}>🧪 Add test names</Btn>
+          <Btn className="btn ghost" style={{ flex: 1 }} onClick={clearTest}>🧹 Remove</Btn>
         </div>
+      </div>
+      <div className="card" style={{ marginTop: 14 }}>
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>🏆 Weekly Top 20 reward</div>
+        <div className="s" style={{ color: "var(--muted)", fontSize: 12 }}>
+          Every Monday the new week starts; last week's Top 20 are paid automatically from this pool, split by the rank percentages below.
+          {wk?.last_paid ? ` Last paid week: ${wk.last_paid}.` : ""}
+        </div>
+        {wk && (
+          <>
+            <label className="f">Prize pool (Birr)</label>
+            <input type="number" step="any" value={wk.pool} onChange={(e) => setWk({ ...wk, pool: Number(e.target.value) })} />
+            <label className="f">Rank percentages — 20 numbers for ranks 1–20, must add to 100</label>
+            <input type="text" value={wk.percents} onChange={(e) => setWk({ ...wk, percents: e.target.value })} />
+            <label className="f" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" checked={wk.enabled} onChange={(e) => setWk({ ...wk, enabled: e.target.checked })} style={{ width: 18, height: 18 }} />
+              Weekly rewards ON
+            </label>
+            <Btn className="btn gold" style={{ width: "100%", marginTop: 10 }} onClick={saveWeekly}>💾 Save weekly reward</Btn>
+          </>
+        )}
+      </div>
+      <div className="card" style={{ marginTop: 14 }}>
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>🔐 Webhook secrets</div>
+        <div className="s" style={{ color: "var(--muted)", fontSize: 12 }}>
+          Generates fresh AdsGram + Tads webhook secrets. Do this before pasting the webhook URLs into the ad dashboards — afterwards only the new secrets match.
+        </div>
+        <Btn className="btn ghost" style={{ width: "100%", marginTop: 12 }} onClick={rotateSecrets}>🔐 Rotate secrets</Btn>
       </div>
     </>
   );
@@ -389,7 +440,7 @@ function AdminSettings() {
     catch (e: any) { toast(e?.message || "Load failed"); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
-  if (!s) return <div className="empty">Loading…</div>;
+  if (!s) return <Shimmer rows={3} />;
 
   const num = (key: string, label: string, step = "any") => (
     <>

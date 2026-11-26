@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, fmt, tg, type Task } from "../api";
 import { useApp } from "../App";
+import { Spinner } from "../components/ui";
 
 const ICONS = ["📣", "👥", "🐦", "🎬", "⭐", "🎁"];
 
@@ -145,8 +146,8 @@ export default function Tasks() {
               <button className="btn sm" disabled>✔ Done</button>
             ) : t.status === "claimable" ? (
               <>
-                <button className="btn sm ghost" disabled={busy === t.id} onClick={() => check(t)}>Check</button>
-                <button className="btn sm" disabled={busy === t.id} onClick={() => claim(t)}>Claim</button>
+                <button className="btn sm ghost" disabled={busy === t.id} onClick={() => check(t)}>{busy === t.id ? <Spinner /> : null}Check</button>
+                <button className="btn sm" disabled={busy === t.id} onClick={() => claim(t)}>{busy === t.id ? <Spinner /> : null}Claim</button>
               </>
             ) : (
               <button className="btn sm" disabled={busy === t.id} onClick={() => join(t)}>
@@ -233,7 +234,7 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
         </div>
         <div style={{ height: 10 }} />
         <input placeholder="@yourchannel or -100…" value={channelId} onChange={(e) => setChannelId(e.target.value)} />
-        <button className="btn" disabled={busy} onClick={verify}>{busy ? "…" : "Check & Continue"}</button>
+        <button className="btn" disabled={busy} onClick={verify}>{busy ? <><Spinner />Checking…</> : "Check & Continue"}</button>
         <button className="btn ghost" onClick={() => { setVerified(false); setStep(2); }}>Skip — no channel check</button>
       </div>
     );
@@ -253,7 +254,7 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
       <label className="f">People (slots) — {cfg.min_slots}…{cfg.max_slots}</label>
       <input type="number" value={slots} onChange={(e) => setSlots(e.target.value)} />
       <div className="s" style={{ color: "var(--muted)", fontSize: 13 }}>Total escrow from your balance: <b>{fmt(total)} Birr</b> (unused slots are refunded on cancel)</div>
-      <button className="btn" disabled={busy} onClick={create}>{busy ? "…" : "Create Task"}</button>
+      <button className="btn" disabled={busy} onClick={create}>{busy ? <><Spinner />Creating…</> : "Create Task"}</button>
       <button className="btn ghost" onClick={() => setStep(1)}>← Back</button>
     </div>
   );
