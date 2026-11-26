@@ -187,6 +187,7 @@ function AdminTasks() {
   const [title, setTitle] = useState("");
   const [reward, setReward] = useState("3");
   const [link, setLink] = useState("");
+  const [channel, setChannel] = useState("");
   const [type, setType] = useState("fake");
 
   const load = useCallback(async () => {
@@ -212,9 +213,13 @@ function AdminTasks() {
   async function createTask() {
     if (!title.trim()) return toast("Enter a title");
     try {
-      await api("/api/admin/tasks/create", { title, task_type: type, invite_link: link, reward: Number(reward) });
-      toast("✅ Task created"); setTitle(""); setLink("");
-    } catch (e: any) { toast(e?.message || "Create failed"); }
+      await api("/api/admin/tasks/create", { title, task_type: type, invite_link: link, channel_id: channel, reward: Number(reward) });
+      toast("✅ Task created"); setTitle(""); setLink(""); setChannel("");
+    } catch (e: any) {
+      if (e?.message === "bot_not_admin_in_channel") toast("⚠️ Add @AnonEarnAppBot as an admin in that channel first");
+      else if (e?.message === "force_needs_channel") toast("⚠️ Force tasks need a channel @username or ID");
+      else toast(e?.message || "Create failed");
+    }
     load();
   }
   async function toggleActive(t: Task) {
@@ -263,6 +268,12 @@ function AdminTasks() {
           <option value="force">Force (membership check)</option>
           <option value="manual">Manual (screenshot proof)</option>
         </select>
+        {type === "force" && (
+          <>
+            <label className="f">Channel (@username or ID) — @AnonEarnAppBot must be an admin there</label>
+            <input value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="@YourChannel" />
+          </>
+        )}
         <label className="f">Reward (Birr)</label>
         <input type="number" value={reward} onChange={(e) => setReward(e.target.value)} />
         <button className="btn" onClick={createTask}>➕ Create task</button>
