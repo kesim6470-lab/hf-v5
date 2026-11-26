@@ -751,26 +751,28 @@ class DataEngine:
             "leaderboard_updated_at", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
 
     # Test/demo data for the Top Referrers board (owner request
-    # 2026-11-26): seven sample referrers in a reserved ID range so
-    # they can be removed cleanly. NOT real users — every user_id >=
-    # TEST_ID_BASE belongs to this seed.
+    # 2026-11-26): seven sample referrers. SECURITY (Claude round-3 N1,
+    # CRITICAL): test IDs are NEGATIVE — Telegram user IDs are always
+    # positive and passed 990M years ago, so the old positive base
+    # (990000000) made clear_test_leaderboard delete nearly every REAL
+    # user. A negative range can never collide with a real account.
     TEST_LEADERBOARD = [
         ("Samira", 25), ("Abdi", 18), ("Yoni", 12), ("Bura", 9),
         ("Da", 7), ("Muaze", 5), ("Nati", 3),
     ]
-    TEST_ID_BASE = 990000000
+    TEST_ID_BASE = -1_000_000
 
     @staticmethod
     async def seed_test_leaderboard():
         async with aiosqlite.connect(DB_PATH) as db:
-            invitee = DataEngine.TEST_ID_BASE + 100000
+            invitee = DataEngine.TEST_ID_BASE - 100_000
             for i, (name, refs) in enumerate(DataEngine.TEST_LEADERBOARD):
-                rid = DataEngine.TEST_ID_BASE + i + 1
+                rid = DataEngine.TEST_ID_BASE - (i + 1)
                 await db.execute(
                     "INSERT OR IGNORE INTO users (user_id, username, full_name) VALUES (?,?,?)",
                     (rid, name.lower() + "_test", name))
                 for _ in range(refs):
-                    invitee += 1
+                    invitee -= 1
                     await db.execute(
                         "INSERT OR IGNORE INTO users (user_id, referred_by, referral_paid) VALUES (?,?,1)",
                         (invitee, rid))
@@ -780,7 +782,21 @@ class DataEngine:
     @staticmethod
     async def clear_test_leaderboard():
         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute("DELETE FROM users WHERE user_id >= ?", (DataEngine.TEST_ID_BASE,))
+            # Hard safety cap: the seed creates 7 + 79 = 86 rows. Refuse
+            # to delete if the negative range somehow holds far more.
+            cur = await db.execute("SELECT COUNT(*) FROM users WHERE user_id < 0")
+            if (await cur.fetchone())[0] > 500:
+                raise RuntimeError("refusing to clear test leaderboard: too many rows")
+            await db.execute("DELETE FROM users WHERE user_id < 0")
+            # Legacy cleanup: rows seeded by the pre-fix version in the
+            # positive range — matched exactly (seeded IDs + patterns),
+            # never a range delete.
+            await db.execute(
+                "DELETE FROM users WHERE user_id BETWEEN 990000001 AND 990000007 "
+                "AND username LIKE '%\\_test' ESCAPE '\\'")
+            await db.execute(
+                "DELETE FROM users WHERE user_id BETWEEN 990100001 AND 990100079 "
+                "AND username IS NULL AND balance = 0")
             await db.commit()
         await DataEngine.refresh_leaderboard()
 
@@ -854,6 +870,11 @@ class DataEngine:
     async def full_clear_verification(user_id: int):
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("DELETE FROM verifications WHERE user_id = ?", (user_id,))
+            # Re-audit fix: clearing verification also clears the
+            # fraud_log, so a persistent hard block (ip_farm) can
+            # actually be lifted by an admin — before, nothing anywhere
+            # deleted fraud_log rows and the block was un-clearable.
+            await db.execute("DELETE FROM fraud_log WHERE user_id = ?", (user_id,))
             await db.commit()
 
     @staticmethod
@@ -925,7 +946,12 @@ class DataEngine:
         if not ip or ip in ("127.0.0.1", "::1", "unknown", "BYPASS_ADMIN"):
             return False
         async with aiosqlite.connect(DB_PATH) as db:
-            cur = await db.execute("SELECT ip_address FROM banned_ips WHERE ip_address = ?", (ip,))
+            # Re-audit fix: IP bans expire after 30 days — under CGNAT a
+            # banned address is shared by thousands of subscribers, so a
+            # permanent ban eventually punishes strangers.
+            cur = await db.execute(
+                "SELECT ip_address FROM banned_ips WHERE ip_address = ? "
+                "AND banned_at >= datetime('now', '-30 days')", (ip,))
             return (await cur.fetchone()) is not None
 
     @staticmethod
@@ -959,18 +985,32 @@ class DataEngine:
 
     @staticmethod
     async def has_prior_hard_block(user_id: int) -> bool:
-        """True if this uid was hard-blocked at verification before
-        (self-invite or IP farm — the two unambiguous reasons) within
-        the last 30 days."""
+        """True if this uid was IP-farm blocked at verification within
+        the last 72 hours. Re-audit fix (2026-11-26): 'self_invite' was
+        removed — api_verify already drops a self-ref before any check
+        runs, so persisting it only risked griefing a victim via their
+        own invite link; and 30 days became 72 hours, because the block
+        follows the USER, so a bystander behind a shared CGNAT address
+        stayed locked out long after changing networks. Blocks are also
+        now clearable: full_clear_verification() and an admin unban
+        delete the fraud_log rows."""
         async with aiosqlite.connect(DB_PATH) as db:
             cur = await db.execute(
                 "SELECT COUNT(*) FROM fraud_log WHERE user_id=? "
-                "AND reason IN ('self_invite', 'ip_farm') "
-                "AND logged_at >= datetime('now', '-30 days')",
+                "AND reason = 'ip_farm' "
+                "AND logged_at >= datetime('now', '-72 hours')",
                 (user_id,),
             )
             row = await cur.fetchone()
             return bool(row and row[0] > 0)
+
+    @staticmethod
+    async def clear_fraud_log(user_id: int):
+        """Delete a user's fraud_log rows — the clear path for
+        persistent verification blocks (admin unban / clear)."""
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("DELETE FROM fraud_log WHERE user_id = ?", (user_id,))
+            await db.commit()
 
     @staticmethod
     async def set_referred_by_if_empty(user_id: int, referrer_id: int):
@@ -2430,7 +2470,14 @@ async def evaluate_clone_risk(
     if referrer_id and referrer_id == new_user_id:
         return True, "self_invite", f"referrer_id={referrer_id} {uname_tag}"
 
-    ip_ok = bool(client_ip) and client_ip not in ("127.0.0.1", "::1", "unknown")
+    # Re-audit fix: only a globally-routable IP is a usable correlation
+    # signal — a private / loopback / CGNAT (100.64/10) address is shared
+    # infrastructure, not a device signal (strangers behind the same
+    # carrier NAT must never correlate).
+    try:
+        ip_ok = bool(client_ip) and ipaddress.ip_address(client_ip).is_global
+    except ValueError:
+        ip_ok = False
     fp_ok = bool(fingerprint) and fingerprint not in ("undefined", "null", "")
     _sentinel = ("canvas_err", "webgl_err")
     hw_ok = (
@@ -2609,16 +2656,33 @@ def extract_real_ip(request: Request) -> str:
             peer_ip = ipaddress.ip_address(peer)
         except ValueError:
             peer_ip = None
-        if peer_ip is not None and (peer_ip.is_private or peer_ip.is_loopback):
-            # M6: the direct peer is a platform edge proxy (Railway) —
-            # its address is internal, so the real client IP is the LAST
-            # X-Forwarded-For entry, the one the edge itself appended.
-            # A public direct peer never reaches this branch, so header
-            # spoofing stays impossible (BUG-REPORT #2 stays fixed).
-            forwarded = request.headers.get("X-Forwarded-For", "")
-            parts = [p.strip() for p in forwarded.split(",") if p.strip()]
-            if parts:
-                return parts[-1]
+        if peer_ip is not None and peer_ip.is_global:
+            # Direct exposure: the peer IS the client. Headers are
+            # client-controlled here and stay ignored (BUG-REPORT #2).
+            return peer
+        if peer_ip is not None:
+            # The direct peer is platform edge infrastructure (Railway:
+            # 100.64/10 CGNAT — is_private is False there, is_global is
+            # False, which is why the old is_private check silently
+            # returned the shared edge IP for every user). IP TEST
+            # 2026-11-26 (live logs): the edge STRIPS client-supplied
+            # forwarding headers and sets its own — X-Real-IP always
+            # equalled the real client IP, and X-Forwarded-For's FIRST
+            # entry matched it; later XFF entries are infra hops, never
+            # the client (Claude's "last entry" assumption does not
+            # hold on Railway). Trust X-Real-IP, else the first XFF
+            # entry; if neither is a valid IP, "unknown" — never the
+            # shared edge address.
+            for candidate in (
+                request.headers.get("X-Real-IP", "").strip(),
+                *[p.strip() for p in request.headers.get("X-Forwarded-For", "").split(",")[:1]],
+            ):
+                try:
+                    if candidate and ipaddress.ip_address(candidate).is_global:
+                        return candidate
+                except ValueError:
+                    continue
+            return "unknown"
         return peer
     return "unknown"
 
@@ -5219,17 +5283,7 @@ async def broadcast_to_all_users(text: str, reply_markup: InlineKeyboardMarkup |
 
 
 @api_app.get("/api/withdrawals/recent")
-async def api_recent_withdrawals(request: Request):
-    # TEMP IP TEST (2026-11-26, removed in the same fix batch): log what
-    # Railway's edge actually hands us, so extract_real_ip can be fixed
-    # on evidence instead of assumption (Claude re-audit item 1).
-    logger.warning(
-        "IPTEST peer=%s xff=%r xreal=%r cf=%r",
-        request.client.host if request.client else None,
-        request.headers.get("X-Forwarded-For", ""),
-        request.headers.get("X-Real-IP", ""),
-        request.headers.get("CF-Connecting-IP", ""),
-    )
+async def api_recent_withdrawals():
     enabled = (await DataEngine.get_setting("ticker_enabled", "1")) == "1"
     if not enabled:
         return {"enabled": False, "withdrawals": []}
@@ -5525,6 +5579,25 @@ async def api_admin_leaderboard_clear(body: ApiBase):
     user = await _authenticate(body)
     _require_admin(user)
     await DataEngine.clear_test_leaderboard()
+    return {"ok": True}
+
+
+@api_app.post("/api/admin/security/rotate_secrets")
+async def api_admin_rotate_secrets(body: ApiBase):
+    """Generate fresh AdsGram S2S + Tads webhook secrets (re-audit fix:
+    the old values appeared in plaintext access logs, so they must be
+    considered leaked). Returns no secret values. If the ADSGRAM /
+    TADS env vars are set on the host they override settings, and
+    rotation here would silently do nothing — reported honestly."""
+    user = await _authenticate(body)
+    _require_admin(user)
+    global _adsgram_secret_cache, _tads_webhook_secret_cache
+    if os.getenv("ADSGRAM_S2S_SECRET") or os.getenv("TADS_WEBHOOK_SECRET"):
+        return {"ok": False, "reason": "env_override"}
+    await DataEngine.set_setting("adsgram_s2s_secret", secrets.token_urlsafe(32))
+    await DataEngine.set_setting("tads_webhook_secret", secrets.token_urlsafe(32))
+    _adsgram_secret_cache = None
+    _tads_webhook_secret_cache = None
     return {"ok": True}
 
 
@@ -6981,6 +7054,11 @@ async def api_admin_users_ban(body: AdminUserBanRequest):
     user = await _authenticate(body)
     _require_admin(user)
     await DataEngine.ban_user(body.user_id, body.banned)
+    if not body.banned:
+        # Unbanning also lifts any persistent verification hard block —
+        # the fraud_log rows behind has_prior_hard_block (re-audit fix:
+        # blocks must be clearable from the admin path).
+        await DataEngine.clear_fraud_log(body.user_id)
     return {"ok": True}
 
 
@@ -7094,6 +7172,11 @@ async def api_admin_settings(body: ApiBase):
         ),
         "ad_banner_click_rewards_today": await DataEngine.count_banner_click_rewards_today(),
         "daily_checkin_enabled": (await DataEngine.get_setting("daily_checkin_enabled", "1")) == "1",
+        # Owner toggles (2026-11-26): wired into settings read/update —
+        # before this they existed only as seed rows + claim-path reads,
+        # so the Admin panel could not actually change them (Claude N2).
+        "daily_checkin_require_ad": (await DataEngine.get_setting("daily_checkin_require_ad", "0")) == "1",
+        "ads_maintenance": (await DataEngine.get_setting("ads_maintenance", "1")) == "1",
         "daily_checkin_reward": float(await DataEngine.get_setting("daily_checkin_reward", "5")),
         "daily_checkin_reminder_text": await DataEngine.get_setting(
             "daily_checkin_reminder_text", "⚠️ Couldn't confirm your ad view — try again in a moment"
@@ -7159,6 +7242,8 @@ class AdminSettingsUpdateRequest(ApiBase):
     # these can't accidentally reset what was set from the bot admin panel.
     multi_account_detect_enabled: bool | None = None
     proof_post_enabled: bool | None = None
+    daily_checkin_require_ad: bool | None = None
+    ads_maintenance: bool | None = None
     withdrawal_process_value: str | None = None
     withdrawal_process_unit: str | None = None
 
@@ -7217,6 +7302,10 @@ async def api_admin_settings_update(body: AdminSettingsUpdateRequest):
         await DataEngine.set_setting("multi_account_detect_enabled", "1" if body.multi_account_detect_enabled else "0")
     if body.proof_post_enabled is not None:
         await DataEngine.set_setting("proof_post_enabled", "1" if body.proof_post_enabled else "0")
+    if body.daily_checkin_require_ad is not None:
+        await DataEngine.set_setting("daily_checkin_require_ad", "1" if body.daily_checkin_require_ad else "0")
+    if body.ads_maintenance is not None:
+        await DataEngine.set_setting("ads_maintenance", "1" if body.ads_maintenance else "0")
     if body.withdrawal_process_value is not None and re.fullmatch(r"\d{1,3}(-\d{1,3})?", body.withdrawal_process_value.strip()):
         await DataEngine.set_setting("withdrawal_process_value", body.withdrawal_process_value.strip())
     if body.withdrawal_process_unit in ("hours", "days"):
@@ -7295,6 +7384,15 @@ async def send_db_backup():
         snap_path = f"/tmp/anon_earn_backup_{stamp}.db"
         async with aiosqlite.connect(DB_PATH) as _db:
             await _db.execute(f"VACUUM INTO '{snap_path}'")
+        # Re-audit fix: strip webhook/API secrets from the snapshot
+        # before it leaves the server — the backup channel copy must
+        # not carry live AdsGram/Tads secrets. VACUUM afterwards so the
+        # deleted values don't linger in free pages of the file.
+        async with aiosqlite.connect(snap_path) as _snap:
+            await _snap.execute(
+                "DELETE FROM settings WHERE key LIKE '%secret%' OR key LIKE '%api_key%'")
+            await _snap.commit()
+            await _snap.execute("VACUUM")
         try:
             await bot.send_document(
                 chat_id=DB_BACKUP_CHANNEL_ID,
@@ -7347,7 +7445,11 @@ async def leaderboard_refresh_loop():
 # ═════════════════════════════════════════════════════════════════════════
 async def _run_web_server():
     port = int(os.getenv("PORT", "8000"))
-    config = uvicorn.Config(api_app, host="0.0.0.0", port=port, log_level="info")
+    # access_log=False (re-audit fix): uvicorn's access log writes full
+    # request URLs, and the AdsGram/Tads webhook URLs carry ?secret= —
+    # the secrets were landing in plaintext logs. App-level logging
+    # stays on; only the per-request access line is disabled.
+    config = uvicorn.Config(api_app, host="0.0.0.0", port=port, log_level="info", access_log=False)
     server = uvicorn.Server(config)
     await server.serve()
 
