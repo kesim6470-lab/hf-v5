@@ -381,6 +381,11 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('ads_enabled', '0');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('daily_checkin_require_ad', '0');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('ads_maintenance', '1');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('adsgram_block_id', '');
+-- Withdrawal methods the admin can switch off (owner request 2026-11-26):
+-- disabling Binance leaves Telebirr only, and vice versa. The Withdraw
+-- screen hides disabled methods and /api/withdraw refuses them.
+INSERT OR IGNORE INTO settings (key, value) VALUES ('withdraw_telebirr_enabled', '1');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('withdraw_binance_enabled', '1');
 -- Weekly Top 20 rewards (owner request 2026-11-26): every week the 20
 -- users with the most PAID referrals that week split a prize pool by
 -- rank percentages; the split is automatic (weekly_top_payout_loop).
@@ -5651,7 +5656,9 @@ async def api_verify(body: VerifyRequest, request: Request):
             try:
                 await bot.send_message(
                     referred_by,
-                    f"🎉 Someone joined using your referral link! +{rate:.2f} Birr credited to your balance."
+                    f"🎉 New referral!\n"
+                    f"💰 +{rate:.2f} Birr added to your balance — your invitee just joined and verified.\n"
+                    f"Keep inviting and earn more! 🚀"
                 )
             except Exception:
                 pass
@@ -5700,6 +5707,10 @@ async def api_me(body: ApiBase):
         "is_admin": evaluate_admin_access(user["user_id"]),
         "support_username": (await DataEngine.get_setting("support_username", "") or "").lstrip("@"),
         "withdrawal_process_time": await get_withdrawal_process_text(),
+        "withdraw_methods": {
+            "telebirr": (await DataEngine.get_setting("withdraw_telebirr_enabled", "1")) == "1",
+            "binance": (await DataEngine.get_setting("withdraw_binance_enabled", "1")) == "1",
+        },
     }
 
 
@@ -6922,6 +6933,11 @@ async def api_withdraw(body: WithdrawRequest):
         raise HTTPException(status_code=400, detail=f"min_withdrawal_is_{min_w:.2f}")
 
     method = body.method.strip().lower() if body.method.strip().lower() == "binance" else "telebirr"
+    # Admin can disable a method in Settings (owner request 2026-11-26) —
+    # a disabled method is refused even if the client still offers it.
+    _method_setting = "withdraw_binance_enabled" if method == "binance" else "withdraw_telebirr_enabled"
+    if (await DataEngine.get_setting(_method_setting, "1")) != "1":
+        raise HTTPException(status_code=400, detail="method_disabled")
     if method == "binance":
         binance_uid = body.binance_uid.strip()
         if len(binance_uid) < 5:
@@ -7400,6 +7416,9 @@ async def api_admin_settings(body: ApiBase):
         "proof_post_enabled": (await DataEngine.get_setting("proof_post_enabled", "1")) == "1",
         "withdrawal_process_value": (await DataEngine.get_setting("withdrawal_process_value", "24-48") or "24-48"),
         "withdrawal_process_unit": (await DataEngine.get_setting("withdrawal_process_unit", "hours") or "hours"),
+        # Withdrawal method switches (owner request 2026-11-26)
+        "withdraw_telebirr_enabled": (await DataEngine.get_setting("withdraw_telebirr_enabled", "1")) == "1",
+        "withdraw_binance_enabled": (await DataEngine.get_setting("withdraw_binance_enabled", "1")) == "1",
     }
 
 
@@ -7434,6 +7453,9 @@ class AdminSettingsUpdateRequest(ApiBase):
     user_task_min_slots: int = 5
     user_task_max_slots: int = 500
     support_username: str = ""
+    # Withdrawal method switches (owner request 2026-11-26)
+    withdraw_telebirr_enabled: bool = True
+    withdraw_binance_enabled: bool = True
     # Optional (None = leave unchanged), like multi_account_detect_enabled
     # below: the Mini App's saveSettings() never sends these two fields,
     # and the old non-Optional defaults (True / "[]") were written back on
@@ -7497,6 +7519,8 @@ async def api_admin_settings_update(body: AdminSettingsUpdateRequest):
     await DataEngine.set_setting("user_task_min_slots", str(body.user_task_min_slots))
     await DataEngine.set_setting("user_task_max_slots", str(body.user_task_max_slots))
     await DataEngine.set_setting("support_username", body.support_username.strip().lstrip("@"))
+    await DataEngine.set_setting("withdraw_telebirr_enabled", "1" if body.withdraw_telebirr_enabled else "0")
+    await DataEngine.set_setting("withdraw_binance_enabled", "1" if body.withdraw_binance_enabled else "0")
     if body.ticker_enabled is not None:
         await DataEngine.set_setting("ticker_enabled", "1" if body.ticker_enabled else "0")
     if body.ticker_custom_names is not None:
