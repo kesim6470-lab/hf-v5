@@ -52,10 +52,11 @@ function Overview() {
   // hooks MUST stay above the early return below — hooks after a
   // conditional return crash React ("Rendered more hooks than during
   // the previous render") and blank the whole app.
-  const [wk, setWk] = useState<{ pool: number; percents: string; enabled: boolean; last_paid: string } | null>(null);
+  const [wk, setWk] = useState<{ pool: number; percents: string; enabled: boolean; last_paid: string; exclude_ids: string } | null>(null);
   useEffect(() => {
     api<any>("/api/admin/weekly_top").then((r) => setWk({
       pool: r.pool, percents: r.percents.join(", "), enabled: r.enabled, last_paid: r.last_paid || "",
+      exclude_ids: (r.exclude_ids || []).join(", "),
     })).catch(() => {});
   }, []);
   if (!stats) return <Shimmer rows={3} />;
@@ -80,8 +81,9 @@ function Overview() {
   async function saveWeekly() {
     if (!wk) return;
     const percents = wk.percents.split(",").map((x) => Number(x.trim())).filter((x) => !Number.isNaN(x));
+    const exclude_ids = wk.exclude_ids.split(",").map((x) => Number(x.trim())).filter((x) => Number.isInteger(x) && x > 0);
     try {
-      await api("/api/admin/weekly_top/save", { pool: Number(wk.pool), percents, enabled: wk.enabled });
+      await api("/api/admin/weekly_top/save", { pool: Number(wk.pool), percents, enabled: wk.enabled, exclude_ids });
       toast("🏆 Weekly reward saved");
     } catch (e: any) { toast(e?.message || "Failed — percentages must be 20 numbers adding to 100"); }
   }
@@ -95,7 +97,7 @@ function Overview() {
       <div className="card" style={{ marginTop: 14 }}>
         <div style={{ fontWeight: 800, marginBottom: 6 }}>🏆 Top Referrers — test data</div>
         <div className="s" style={{ color: "var(--muted)", fontSize: 12 }}>
-          Adds sample names (Samira, Abdi, Yoni, Bura, Da, Muaze, Nati) to the Top board so you can preview it. Remove them before real users arrive.
+          Adds sample names (dawit T, Mule Mosisa, Tame, wildflower, Suru, Unfair World, Kasahun, Cr 7) to the Top board so you can preview it. Remove them before real users arrive.
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Btn className="btn gold" style={{ flex: 1 }} onClick={seedTest}>🧪 Add test names</Btn>
@@ -114,6 +116,8 @@ function Overview() {
             <input type="number" step="any" value={wk.pool} onChange={(e) => setWk({ ...wk, pool: Number(e.target.value) })} />
             <label className="f">Rank percentages — 20 numbers for ranks 1–20, must add to 100</label>
             <input type="text" value={wk.percents} onChange={(e) => setWk({ ...wk, percents: e.target.value })} />
+            <label className="f">Removed from Top — user IDs, comma separated (they won't show on the board or be paid)</label>
+            <input type="text" value={wk.exclude_ids} onChange={(e) => setWk({ ...wk, exclude_ids: e.target.value })} placeholder="e.g. 6095314644, 6924162851" />
             <label className="f" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input type="checkbox" checked={wk.enabled} onChange={(e) => setWk({ ...wk, enabled: e.target.checked })} style={{ width: 18, height: 18 }} />
               Weekly rewards ON
