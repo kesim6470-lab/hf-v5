@@ -126,6 +126,29 @@ def _telebirr_proof_photo():
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "telebirr.png")
     return FSInputFile(p) if os.path.exists(p) else TELEBIRR_PROOF_IMAGE
 
+async def _send_proof_photo(chat_id, caption, reply_markup=None, reply_to_message_id=None):
+    """Send the Telebirr proof photo the efficient way (owner question
+    2026-11-26): the banner file is uploaded ONCE; the file_id Telegram
+    returns is cached in settings (telebirr_proof_file_id) and reused
+    for every later post — no repeated uploads, nothing accumulates.
+    If a cached id ever fails, it is cleared and the file re-uploaded."""
+    kwargs = {"caption": caption, "reply_markup": reply_markup}
+    if reply_to_message_id:
+        kwargs["reply_to_message_id"] = reply_to_message_id
+    fid = await DataEngine.get_setting("telebirr_proof_file_id", "")
+    if fid:
+        try:
+            return await bot.send_photo(chat_id, photo=fid, **kwargs)
+        except Exception:
+            await DataEngine.set_setting("telebirr_proof_file_id", "")
+    msg = await bot.send_photo(chat_id, photo=_telebirr_proof_photo(), **kwargs)
+    try:
+        if getattr(msg, "photo", None):
+            await DataEngine.set_setting("telebirr_proof_file_id", msg.photo[-1].file_id)
+    except Exception:
+        pass
+    return msg
+
 if not WEBAPP_URL.startswith(("http://", "https://")):
     WEBAPP_URL = f"https://{WEBAPP_URL}"
 
@@ -3946,7 +3969,7 @@ async def dispatch_withdrawal_core(
                 # Telebirr requests carry the Telebirr image, like the
                 # completion proof does (owner spec 2026-11-26).
                 try:
-                    receipt = await bot.send_photo(PAYMENT_LOG_CHANNEL, photo=_telebirr_proof_photo(), caption=txt, reply_markup=proof_channel_keyboard)
+                    receipt = await _send_proof_photo(PAYMENT_LOG_CHANNEL, txt, reply_markup=proof_channel_keyboard)
                 except Exception:
                     receipt = await bot.send_message(PAYMENT_LOG_CHANNEL, txt, reply_markup=proof_channel_keyboard)
             post_id = receipt.message_id
@@ -4234,12 +4257,11 @@ async def approve_withdrawal_core(tid: int, notify_mode: str = "both") -> dict:
                     reply_markup=proof_channel_keyboard
                 )
             else:
-                await bot.send_photo(
-                    chat_id=PAYMENT_LOG_CHANNEL,
-                    photo=_telebirr_proof_photo(),
-                    caption=txt,
-                    reply_to_message_id=ticket["channel_post_id"],
-                    reply_markup=proof_channel_keyboard
+                await _send_proof_photo(
+                    PAYMENT_LOG_CHANNEL,
+                    txt,
+                    reply_markup=proof_channel_keyboard,
+                    reply_to_message_id=ticket["channel_post_id"]
                 )
         except Exception as e:
             logger.error(f"Proof Photo Error: {e}")
