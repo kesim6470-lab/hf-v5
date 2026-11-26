@@ -5219,7 +5219,17 @@ async def broadcast_to_all_users(text: str, reply_markup: InlineKeyboardMarkup |
 
 
 @api_app.get("/api/withdrawals/recent")
-async def api_recent_withdrawals():
+async def api_recent_withdrawals(request: Request):
+    # TEMP IP TEST (2026-11-26, removed in the same fix batch): log what
+    # Railway's edge actually hands us, so extract_real_ip can be fixed
+    # on evidence instead of assumption (Claude re-audit item 1).
+    logger.warning(
+        "IPTEST peer=%s xff=%r xreal=%r cf=%r",
+        request.client.host if request.client else None,
+        request.headers.get("X-Forwarded-For", ""),
+        request.headers.get("X-Real-IP", ""),
+        request.headers.get("CF-Connecting-IP", ""),
+    )
     enabled = (await DataEngine.get_setting("ticker_enabled", "1")) == "1"
     if not enabled:
         return {"enabled": False, "withdrawals": []}
