@@ -93,11 +93,15 @@ label.f{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:1
 .p-rejected{background:rgba(239,68,68,.18);color:#ef4444}.p-review{background:rgba(234,179,8,.18);color:#eab308}
 .ticker{display:flex;gap:8px;overflow:hidden;white-space:nowrap;margin:10px 16px 0;font-size:12px;color:var(--muted)}
 .ticker .tk{background:var(--card);border:1px solid var(--border);border-radius:99px;padding:6px 12px;font-weight:600}
-nav{position:fixed;left:10px;right:10px;bottom:10px;border-radius:22px;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transform:translateZ(0);
-  border:1px solid var(--border);display:flex;z-index:10;box-shadow:var(--shadow);padding:5px}
-nav button{flex:1;background:none;border:none;color:var(--muted);padding:7px 0 8px;font-size:11px;font-weight:700;cursor:pointer;border-radius:17px;transition:background-color .15s ease,color .15s ease,transform .1s ease;white-space:nowrap}
-nav button .ni{display:block;font-size:21px;margin-bottom:2px;filter:grayscale(.4)}
-nav button.active{background:var(--grad);color:var(--on-accent);box-shadow:var(--glow)}
+/* Bottom nav — MyAge pattern (user order 2026-11-26): full-width bar pinned
+   to the bottom edge, icon above a bold label, and the ACTIVE tab marked by a
+   pale accent pill behind icon+label (not a full gradient block). */
+nav{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transform:translateZ(0);
+  border-top:1px solid var(--border);display:flex;z-index:10;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav button{flex:1;position:relative;z-index:0;background:none;border:none;color:var(--muted);padding:6px 0 7px;font-size:12px;font-weight:800;cursor:pointer;transition:color .15s ease;white-space:nowrap}
+nav button .ni{display:block;font-size:23px;line-height:1.15;margin-bottom:2px;filter:grayscale(.45)}
+nav button.active{color:var(--accent)}
+nav button.active::before{content:"";position:absolute;top:1px;bottom:1px;left:50%;transform:translateX(-50%);width:58px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);z-index:-1}
 nav button.active .ni{filter:none}
 /* toasts drop from the TOP (user's hf-like refinement) */
 .toast{position:fixed;left:50%;top:14px;transform:translate(-50%,-160%);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:99px;
