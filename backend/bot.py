@@ -816,8 +816,10 @@ class DataEngine:
     # (990000000) made clear_test_leaderboard delete nearly every REAL
     # user. A negative range can never collide with a real account.
     TEST_LEADERBOARD = [
-        ("dawit T", 25), ("Mule Mosisa", 21), ("Tame", 18), ("wildflower", 15),
-        ("Suru", 12), ("Unfair World", 9), ("Kasahun", 6), ("Cr 7", 4),
+        ("Samira", 30), ("dawit T", 27), ("Abdi", 24), ("Mule Mosisa", 22),
+        ("Yoni", 19), ("Tame", 17), ("wildflower", 15), ("Bura", 13),
+        ("Suru", 11), ("Da", 10), ("Unfair World", 8), ("Muaze", 7),
+        ("Kasahun", 6), ("Nati", 5), ("Cr 7", 4),
     ]
     TEST_ID_BASE = -1_000_000
 
@@ -841,7 +843,7 @@ class DataEngine:
     @staticmethod
     async def clear_test_leaderboard():
         async with aiosqlite.connect(DB_PATH) as db:
-            # Hard safety cap: the seed creates 8 + 110 = 118 rows. Refuse
+            # Hard safety cap: the seed creates 15 + 218 = 233 rows. Refuse
             # to delete if the negative range somehow holds far more.
             cur = await db.execute("SELECT COUNT(*) FROM users WHERE user_id < 0")
             if (await cur.fetchone())[0] > 500:
