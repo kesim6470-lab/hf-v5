@@ -264,8 +264,8 @@ function AdminTasks() {
         <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://t.me/…" />
         <label className="f">Type</label>
         <select value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="fake">Fake (wait timer)</option>
-          <option value="force">Force (membership check)</option>
+          <option value="fake">No check (timer only)</option>
+          <option value="force">Force check (must join channel)</option>
           <option value="manual">Manual (screenshot proof)</option>
         </select>
         {type === "force" && (
