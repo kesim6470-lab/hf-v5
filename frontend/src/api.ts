@@ -61,6 +61,7 @@ export interface Me {
   is_admin: boolean;
   support_username: string;
   withdrawal_process_time: string;
+  withdraw_methods: { telebirr: boolean; binance: boolean };
 }
 
 export interface AdsStatus {

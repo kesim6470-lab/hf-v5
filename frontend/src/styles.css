@@ -114,7 +114,8 @@ nav .nav-pill{position:absolute;top:6px;bottom:6px;left:0;border-radius:999px;ba
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .empty{color:var(--muted);text-align:center;padding:22px 8px;font-size:14px}
 .seg{display:flex;gap:8px;margin:14px 0}
-.seg button{flex:1;padding:10px;border-radius:13px;border:1px solid var(--border);background:var(--glass);color:var(--muted);font-weight:800;cursor:pointer;font-size:13px}
+.seg button{flex:1;padding:10px;border-radius:13px;border:1px solid var(--border);background:var(--glass);color:var(--muted);font-weight:800;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px}
+.seg button svg{flex:none}
 .seg button.active{background:var(--grad);color:var(--on-accent);border-color:transparent}
 .spin-ico{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp 0.7s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
