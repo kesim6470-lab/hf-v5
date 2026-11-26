@@ -532,6 +532,16 @@ MIGRATION_STATEMENTS = [
         user_id   INTEGER PRIMARY KEY,
         marked_at TEXT DEFAULT (datetime('now'))
     )""",
+    # Top Referrers snapshot — recomputed at startup and every 12 hours
+    # by leaderboard_refresh_loop; the Mini App reads only this table,
+    # so the public board changes at most twice a day (owner request
+    # 2026-11-26).
+    """CREATE TABLE IF NOT EXISTS leaderboard_snapshot (
+        user_id   INTEGER PRIMARY KEY,
+        full_name TEXT,
+        username  TEXT,
+        refs      INTEGER DEFAULT 0
+    )""",
     # Reconciles AdsGram's S2S postback with Tads's client-reported
     # outcome, whichever of the two arrives first — see
     # gate_adsgram_confirmation / record_tads_result. One row per user;
@@ -719,6 +729,36 @@ class DataEngine:
             )
             tier2_count = (await cur2.fetchone())[0] or 0
             return direct_count, tier2_count
+
+    @staticmethod
+    async def refresh_leaderboard():
+        """Recompute the Top Referrers snapshot: top 50 users by PAID
+        direct referrals (referral_paid = 1 — the same count referrers
+        themselves see), banned referrers excluded. Called at startup
+        and then every 12 hours by leaderboard_refresh_loop."""
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("DELETE FROM leaderboard_snapshot")
+            await db.execute(
+                "INSERT INTO leaderboard_snapshot (user_id, full_name, username, refs) "
+                "SELECT r.referred_by, u.full_name, u.username, COUNT(*) AS refs "
+                "FROM users r JOIN users u ON u.user_id = r.referred_by "
+                "WHERE r.referred_by IS NOT NULL AND r.referral_paid = 1 "
+                "AND COALESCE(u.is_banned, 0) = 0 "
+                "GROUP BY r.referred_by ORDER BY refs DESC, u.joined_at ASC LIMIT 50"
+            )
+            await db.commit()
+        await DataEngine.set_setting(
+            "leaderboard_updated_at", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
+
+    @staticmethod
+    async def get_leaderboard_rows():
+        async with aiosqlite.connect(DB_PATH) as db:
+            cur = await db.execute(
+                "SELECT user_id, full_name, username, refs FROM leaderboard_snapshot "
+                "ORDER BY refs DESC, user_id ASC")
+            rows = await cur.fetchall()
+            return [{"user_id": r[0], "full_name": r[1], "username": r[2], "refs": r[3]}
+                    for r in rows]
 
     @staticmethod
     async def get_referral_metrics(user_id: int):
@@ -5399,6 +5439,35 @@ async def api_me(body: ApiBase):
     }
 
 
+# ── /api/leaderboard — Top Referrers, served from the 12-hour snapshot ──
+@api_app.post("/api/leaderboard")
+async def api_leaderboard(body: ApiBase):
+    user = await _authenticate(body)
+    uid = user["user_id"]
+    rows = await DataEngine.get_leaderboard_rows()
+    rate = float(await DataEngine.get_setting("reward_per_referral", "10"))
+    updated_at = await DataEngine.get_setting("leaderboard_updated_at", "") or ""
+
+    def pub(i, r):
+        return {
+            "rank": i + 1,
+            "name": r["full_name"] or (("@" + r["username"]) if r["username"] else "User"),
+            "refs": r["refs"],
+            "earned": round(r["refs"] * rate, 2),
+            "is_me": r["user_id"] == uid,
+        }
+
+    top = [pub(i, r) for i, r in enumerate(rows[:10])]
+    my_idx = next((i for i, r in enumerate(rows) if r["user_id"] == uid), None)
+    if my_idx is not None:
+        mine = {"rank": my_idx + 1, "refs": rows[my_idx]["refs"],
+                "earned": round(rows[my_idx]["refs"] * rate, 2)}
+    else:
+        direct, _t2 = await DataEngine.get_paid_referral_metrics(uid)
+        mine = {"rank": None, "refs": direct, "earned": round(direct * rate, 2)}
+    return {"updated_at": updated_at, "top": top, "me": mine}
+
+
 # ── /api/invite/share_card — sends the user a ready-to-forward invite
 #    message (bot's photo + a written invite caption + an inline button
 #    holding their referral link) in their own chat with the bot, so they
@@ -7189,6 +7258,28 @@ async def db_backup_loop():
         await send_db_backup()
 
 
+async def leaderboard_refresh_loop():
+    # Top Referrers board: refresh at startup, then re-check hourly and
+    # rebuild whenever the snapshot is 12+ hours old — the board users
+    # see updates every 12 hours, even across restarts.
+    while True:
+        try:
+            ts = await DataEngine.get_setting("leaderboard_updated_at", "")
+            stale = True
+            if ts:
+                try:
+                    age = (datetime.utcnow() - datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")).total_seconds()
+                    stale = age >= 12 * 3600
+                except Exception:
+                    stale = True
+            if stale:
+                await DataEngine.refresh_leaderboard()
+                logger.info("Leaderboard snapshot refreshed")
+        except Exception as e:
+            logger.warning(f"Leaderboard refresh failed: {e}")
+        await asyncio.sleep(3600)
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # ENTRYPOINT — runs the Telegram long-poller AND the Mini App web server
 # in the same process (this is what Railway's "web: python bot.py" and
@@ -7224,6 +7315,7 @@ async def _main():
     _polling_task = asyncio.create_task(dp.start_polling(bot, skip_updates=True))
     asyncio.create_task(db_backup_loop())
     asyncio.create_task(notify_ad_limit_reset_loop())
+    asyncio.create_task(leaderboard_refresh_loop())
     await _run_web_server()
 
 
