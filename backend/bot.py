@@ -7351,6 +7351,96 @@ async def api_admin_channels_delete(body: AdminIdRequest):
     return {"ok": True}
 
 
+class AdminChannelCheckRequest(ApiBase):
+    user_id: int = 0  # optional: also test this user's membership
+
+
+@api_app.post("/api/admin/channels/check")
+async def api_admin_channels_check(body: AdminChannelCheckRequest):
+    """Force-join CHECKER (owner request 2026-11-26): for every gate
+    channel, ask Telegram for the BOT's own membership status. The bot
+    can only verify users in channels where it is an admin — anywhere
+    else getChatMember is refused and the gate silently passes
+    everyone, which is exactly the failure this tool exists to expose.
+    With user_id set, also reports that user's membership per channel."""
+    user = await _authenticate(body)
+    _require_admin(user)
+    bot_id = BOT_ID or (await bot.get_me()).id
+    results = []
+    for ch in await DataEngine.get_force_channels():
+        cid = (ch["channel_id"] or "").strip()
+        row = {"channel_id": cid, "channel_name": ch["channel_name"],
+               "invite_link": ch["invite_link"],
+               "mode": "fake" if ch["bot_added"] == 1 else "real",
+               "bot_status": "", "can_check": False,
+               "user_status": "", "error": ""}
+        if ch["bot_added"] == 1:
+            row["bot_status"] = "n/a — fake join, no membership check"
+        elif not cid:
+            row["bot_status"] = "no channel ID stored"
+            row["error"] = "missing_channel_id"
+        else:
+            try:
+                me = await bot.get_chat_member(chat_id=cid, user_id=bot_id)
+                st = me.status.value if hasattr(me.status, "value") else str(me.status)
+                row["bot_status"] = st
+                row["can_check"] = st in ("administrator", "creator")
+            except Exception as e:
+                row["bot_status"] = "not_a_member"
+                row["error"] = str(e)[:140]
+            if body.user_id:
+                try:
+                    m = await bot.get_chat_member(chat_id=cid, user_id=body.user_id)
+                    row["user_status"] = m.status.value if hasattr(m.status, "value") else str(m.status)
+                except Exception as e:
+                    row["user_status"] = "unknown"
+                    if not row["error"]:
+                        row["error"] = str(e)[:140]
+        results.append(row)
+    return {"bot_id": bot_id, "results": results}
+
+
+class AdminChannelCheckOneRequest(ApiBase):
+    ref: str  # numeric channel ID, @username, or https://t.me/name link
+
+
+@api_app.post("/api/admin/channels/check_one")
+async def api_admin_channels_check_one(body: AdminChannelCheckOneRequest):
+    """Single-channel bot-admin checker — used beside the Channels form
+    and beside the Force-task channel field: given any channel ref,
+    resolve it and report whether @AnonEarnAppBot is an admin there
+    (the condition for real membership checks to work at all)."""
+    user = await _authenticate(body)
+    _require_admin(user)
+    ref = body.ref.strip()
+    if ref.startswith("https://t.me/") or ref.startswith("http://t.me/"):
+        ref = ref.split("t.me/", 1)[1].strip("/")
+    if ref and not ref.startswith("@") and not ref.lstrip("-").isdigit():
+        ref = "@" + ref
+    chat_ref: object = int(ref) if ref.lstrip("-").isdigit() else ref
+    bot_id = BOT_ID or (await bot.get_me()).id
+    out = {"ref": body.ref, "chat_id": "", "chat_title": "",
+           "bot_status": "", "can_check": False, "error": ""}
+    try:
+        chat = await bot.get_chat(chat_id=chat_ref)
+        out["chat_id"] = str(chat.id)
+        out["chat_title"] = chat.title or ""
+        chat_ref = chat.id
+    except Exception as e:
+        out["error"] = str(e)[:140]
+        out["bot_status"] = "chat_not_found"
+        return out
+    try:
+        me = await bot.get_chat_member(chat_id=chat_ref, user_id=bot_id)
+        st = me.status.value if hasattr(me.status, "value") else str(me.status)
+        out["bot_status"] = st
+        out["can_check"] = st in ("administrator", "creator")
+    except Exception as e:
+        out["bot_status"] = "not_a_member"
+        out["error"] = str(e)[:140]
+    return out
+
+
 # ── /api/admin/withdrawals/* ──────────────────────────────────────────────
 @api_app.post("/api/admin/withdrawals/list")
 async def api_admin_withdrawals_list(body: ApiBase):
