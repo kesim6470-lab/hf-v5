@@ -314,28 +314,56 @@ function AdminUsers() {
   const [uid, setUid] = useState("");
   const [user, setUser] = useState<any>(null);
   const [amount, setAmount] = useState("");
+  const [matches, setMatches] = useState<any[]>([]);
 
-  async function search() {
+  async function loadById(id: number) {
     try {
-      const r = await api<any>("/api/admin/users/search", { user_id: Number(uid) });
+      const r = await api<any>("/api/admin/users/search", { user_id: id });
       setUser(r);
     } catch (e: any) { toast(e?.message || "Not found"); setUser(null); }
   }
+  async function search() {
+    const q = uid.trim();
+    if (!q) return;
+    setMatches([]);
+    if (/^\d+$/.test(q)) { loadById(Number(q)); return; }
+    // Name / username search (added 2026-11-26: the box used to accept
+    // numeric IDs only, so a name seen on the Top board could not be
+    // looked up).
+    try {
+      const r = await api<{ matches: any[] }>("/api/admin/users/find", { q });
+      const m = r.matches || [];
+      if (m.length === 0) { toast("No users match that name"); setUser(null); return; }
+      if (m.length === 1) { loadById(m[0].user_id); return; }
+      setMatches(m);
+      toast(`${m.length} users match — tap one`);
+    } catch (e: any) { toast(e?.message || "Search failed"); }
+  }
   async function ban(banned: boolean) {
-    try { await api("/api/admin/users/ban", { user_id: user.user_id, banned: banned ? 1 : 0 }); toast(banned ? "🚫 Banned" : "✅ Unbanned"); search(); }
+    try { await api("/api/admin/users/ban", { user_id: user.user_id, banned: banned ? 1 : 0 }); toast(banned ? "🚫 Banned" : "✅ Unbanned"); loadById(user.user_id); }
     catch (e: any) { toast(e?.message || "Failed"); }
   }
   async function balance() {
-    try { await api("/api/admin/users/balance", { user_id: user.user_id, amount: Number(amount) }); toast("✅ Balance adjusted"); setAmount(""); search(); }
+    try { await api("/api/admin/users/balance", { user_id: user.user_id, amount: Number(amount) }); toast("✅ Balance adjusted"); setAmount(""); loadById(user.user_id); }
     catch (e: any) { toast(e?.message || "Failed"); }
   }
 
   return (
     <>
       <div className="card">
-        <label className="f">Telegram user ID</label>
-        <input value={uid} onChange={(e) => setUid(e.target.value)} inputMode="numeric" placeholder="e.g. 123456789" />
+        <label className="f">Telegram user ID or name</label>
+        <input value={uid} onChange={(e) => setUid(e.target.value)} placeholder="e.g. 123456789 or a name like HF bot" />
         <button className="btn" onClick={search}>🔍 Search</button>
+        {matches.length > 0 && (
+          <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+            {matches.map((m) => (
+              <button key={m.user_id} className="btn ghost" style={{ textAlign: "left" }}
+                onClick={() => { setMatches([]); loadById(m.user_id); }}>
+                {m.full_name || "—"} {m.username ? `(@${m.username})` : ""} · ID {m.user_id} · {fmt(m.balance)} Birr{m.is_banned ? " · 🚫" : ""}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {user && (
         <div className="card" style={{ marginTop: 12 }}>
