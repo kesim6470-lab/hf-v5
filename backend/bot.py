@@ -116,6 +116,16 @@ MAX_INIT_DATA_AGE_SECONDS = int(os.getenv("MAX_INIT_DATA_AGE_SECONDS", str(6 * 3
 
 TELEBIRR_PROOF_IMAGE = "AgACAgQAAxkBAAIBImpM6RKFmzDV8HLYo0XHukkMK-RaAAI-D2sbGJdwUazZrBH4OObkAQADAgADeAADPAQ"
 
+def _telebirr_proof_photo():
+    """The Telebirr proof image, uploaded from the bundled asset.
+    The stored file_id above was issued to a DIFFERENT bot — Telegram
+    file_ids are per-bot, so send_photo with it fails for this bot and
+    the proof posts silently fell back to text (owner report
+    2026-11-26: "works but no image"). Uploading assets/telebirr.png
+    always works."""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "telebirr.png")
+    return FSInputFile(p) if os.path.exists(p) else TELEBIRR_PROOF_IMAGE
+
 if not WEBAPP_URL.startswith(("http://", "https://")):
     WEBAPP_URL = f"https://{WEBAPP_URL}"
 
@@ -3936,7 +3946,7 @@ async def dispatch_withdrawal_core(
                 # Telebirr requests carry the Telebirr image, like the
                 # completion proof does (owner spec 2026-11-26).
                 try:
-                    receipt = await bot.send_photo(PAYMENT_LOG_CHANNEL, photo=TELEBIRR_PROOF_IMAGE, caption=txt, reply_markup=proof_channel_keyboard)
+                    receipt = await bot.send_photo(PAYMENT_LOG_CHANNEL, photo=_telebirr_proof_photo(), caption=txt, reply_markup=proof_channel_keyboard)
                 except Exception:
                     receipt = await bot.send_message(PAYMENT_LOG_CHANNEL, txt, reply_markup=proof_channel_keyboard)
             post_id = receipt.message_id
@@ -4226,7 +4236,7 @@ async def approve_withdrawal_core(tid: int, notify_mode: str = "both") -> dict:
             else:
                 await bot.send_photo(
                     chat_id=PAYMENT_LOG_CHANNEL,
-                    photo=TELEBIRR_PROOF_IMAGE,
+                    photo=_telebirr_proof_photo(),
                     caption=txt,
                     reply_to_message_id=ticket["channel_post_id"],
                     reply_markup=proof_channel_keyboard
