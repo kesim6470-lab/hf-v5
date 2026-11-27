@@ -67,13 +67,25 @@ export default function App() {
     Promise.all([refreshMe(), fetchGate()]).finally(() => setBooted(true));
   }, [refreshMe, fetchGate]);
 
-  // Coming back from a channel (after tapping Join) re-checks the gate
-  // automatically — the moment every channel is joined, the app opens.
+  // Re-check the gate whenever the app returns to the foreground —
+  // a user who LEAVES a required channel while using the app must be
+  // gated again (owner order 2026-11-26), not only users who were
+  // already gated at boot.
   useEffect(() => {
-    const onVis = () => { if (document.visibilityState === "visible" && forceUnjoined && forceUnjoined.length > 0) fetchGate(); };
+    const onVis = () => { if (document.visibilityState === "visible") fetchGate(); };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [fetchGate, forceUnjoined]);
+  }, [fetchGate]);
+
+  // And re-check periodically while the app stays open. Owner order
+  // 2026-11-26: every 5 minutes — the backend also caches a passing
+  // result per user for 5 minutes, so Telegram is never hammered with
+  // repeated membership lookups; a channel-leaver is still caught and
+  // forced to re-join within one cycle.
+  useEffect(() => {
+    const t = setInterval(() => { fetchGate(); }, 300_000);
+    return () => clearInterval(t);
+  }, [fetchGate]);
 
   async function checkGateNow() {
     setCheckingGate(true);
@@ -195,27 +207,37 @@ export default function App() {
             </div>
           </div>
         ) : forceUnjoined && forceUnjoined.length > 0 ? (
-          <div className="card app-enter" style={{ marginTop: 18 }}>
-            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>🔒 Join to continue</div>
-            <div style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.55 }}>
-              You must join <b>all</b> channels below to use Anon Earn. Tap <b>Join</b> for each one,
-              then come back — we re-check automatically, or tap the check button.
-            </div>
-            {forceUnjoined.map((c: any) => (
-              <div className="row" key={c.id} style={{ marginTop: 12, marginBottom: 0 }}>
-                <div className="tic">📣</div>
-                <div className="grow"><div className="t">{c.channel_name}</div><div className="s">Membership required</div></div>
-                <button className="btn sm" onClick={() => {
-                  const link = c.invite_link || "";
-                  if (link.startsWith("https://t.me/") && tg?.openTelegramLink) tg.openTelegramLink(link);
-                  else if (tg?.openLink) tg.openLink(link);
-                  else window.open(link, "_blank");
-                }}>Join</button>
+          <div className="gate-wrap app-enter">
+            <div className="gate-card">
+              <img className="gate-logo" src="/logo.jpg" alt="Anon Earn" />
+              <div className="gate-title">Join to continue</div>
+              <div className="gate-sub">
+                To use Anon Earn, join the channels below — it only takes a few seconds.
+                Come back here and we will check automatically.
               </div>
-            ))}
-            <button className="btn" style={{ marginTop: 14, width: "100%" }} disabled={checkingGate} onClick={checkGateNow}>
-              {checkingGate ? "Checking…" : "✅ I Joined — Check"}
-            </button>
+              <div className="gate-count">📣 {forceUnjoined.length} {forceUnjoined.length === 1 ? "channel" : "channels"} to join</div>
+              <div className="gate-list">
+                {forceUnjoined.map((c: any) => (
+                  <div className="gate-row" key={c.id}>
+                    <div className="gate-ava">{(c.channel_name || "C").trim().charAt(0).toUpperCase()}</div>
+                    <div className="gate-meta">
+                      <div className="gate-name">{c.channel_name}</div>
+                      <div className="gate-hint">Membership required</div>
+                    </div>
+                    <button className="gate-join" onClick={() => {
+                      const link = c.invite_link || "";
+                      if (link.startsWith("https://t.me/") && tg?.openTelegramLink) tg.openTelegramLink(link);
+                      else if (tg?.openLink) tg.openLink(link);
+                      else window.open(link, "_blank");
+                    }}>Join</button>
+                  </div>
+                ))}
+              </div>
+              <button className="btn gate-check" disabled={checkingGate} onClick={checkGateNow}>
+                {checkingGate ? "Checking…" : "✅ I Joined — Check"}
+              </button>
+              <div className="gate-note">Stay joined to keep earning 🚀</div>
+            </div>
           </div>
         ) : (
           <div className="app-enter" key={tab}>

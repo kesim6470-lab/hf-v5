@@ -108,6 +108,29 @@ nav button.active{color:var(--navactive)}
 nav button.active .ni svg{animation:navPop .34s cubic-bezier(.22,1.4,.36,1)}
 nav .nav-pill{position:absolute;top:6px;bottom:6px;left:0;border-radius:999px;background:var(--navpill);z-index:0;pointer-events:none;transition:transform .38s cubic-bezier(.22,1.25,.36,1),width .38s cubic-bezier(.22,1.25,.36,1),opacity .2s ease}
 @keyframes navPop{0%{transform:scale(.8)}55%{transform:scale(1.15)}100%{transform:scale(1)}}
+/* Force-join gate — glass card (owner order 2026-11-26: "glass, beautiful,
+   a nice way to show the channel list"), same glass language as the nav. */
+.gate-wrap{margin-top:18px}
+.gate-card{background:var(--navbg);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--navedge);border-radius:26px;box-shadow:var(--shadow);padding:22px 16px 16px;text-align:center;color:var(--navfg)}
+.gate-logo{width:72px;height:72px;border-radius:50%;box-shadow:0 8px 26px rgba(34,211,238,.35);margin-bottom:10px}
+.gate-title{font-weight:800;font-size:19px;margin-bottom:6px}
+.gate-sub{font-size:13.5px;line-height:1.55;opacity:.75;max-width:300px;margin:0 auto}
+.gate-count{display:inline-block;margin-top:12px;padding:6px 12px;border-radius:99px;background:var(--navpill);
+  border:1px solid var(--navedge);font-size:12.5px;font-weight:700}
+.gate-list{margin-top:14px;display:flex;flex-direction:column;gap:8px;text-align:left}
+.gate-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:18px;
+  background:var(--navpill);border:1px solid var(--navedge)}
+.gate-ava{width:42px;height:42px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:17px;color:#fff;background:linear-gradient(135deg,#2aabee,#7c5cff)}
+.gate-meta{flex:1;min-width:0}
+.gate-name{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gate-hint{font-size:12px;opacity:.65}
+.gate-join{flex:none;border:none;cursor:pointer;border-radius:99px;padding:9px 18px;font-size:13.5px;font-weight:800;
+  background:#2aabee;color:#fff;box-shadow:0 4px 14px rgba(42,171,238,.35)}
+.gate-join:active{transform:scale(.96)}
+.gate-check{margin-top:14px;width:100%}
+.gate-note{margin-top:10px;font-size:12px;opacity:.55}
 /* toasts drop from the TOP (user's hf-like refinement) */
 .toast{position:fixed;left:50%;top:14px;transform:translate(-50%,-160%);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:99px;
   font-size:14px;font-weight:700;opacity:0;pointer-events:none;transition:transform .28s cubic-bezier(.21,1.02,.55,1.15),opacity .18s;will-change:transform,opacity;z-index:50;max-width:88vw;text-align:center;box-shadow:var(--shadow)}
