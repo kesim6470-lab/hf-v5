@@ -27,7 +27,9 @@ export default function Invite() {
     "🎯 small missions, quick rewards\n" +
     "🔥 a daily streak that keeps paying\n" +
     "👥 friends I bring in earn me more\n\n" +
-    "Payouts go to Telebirr or Binance Pay.\n\n" +
+    (me.invite_show_binance === false
+      ? "Payouts go to Telebirr.\n\n"
+      : "Payouts go to Telebirr or Binance Pay.\n\n") +
     "Your turn — start free 👇\n" +
     referralLink;
 
