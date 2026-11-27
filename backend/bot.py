@@ -3767,11 +3767,17 @@ async def dashboard_card_text(user_id: int, first_name: str = "") -> str:
 
 
 def generate_dashboard_matrix(user_id: int) -> InlineKeyboardMarkup:
-    # Owner order 2026-11-27: the chat dashboard shows ONLY Balance and
-    # Invite — everything else lives in the Mini App (opened from the
-    # bot's menu button). Admins keep their panel entry.
-    # Layout:  [  Balance  ]  [  Invite Friends  ]
+    # Owner orders 2026-11-27: the chat dashboard shows ONLY Balance and
+    # Invite as action buttons — but the Mini App still needs its open
+    # button in the chat ("miniapp open የለም chat ላይ"), so Launch stays
+    # as the top full-width row. Admins keep their panel entry.
+    # Layout:  [        Launch Anon Earn       ]
+    #          [  Balance  ]  [  Invite Friends  ]
     rows = [
+        [InlineKeyboardButton(
+            text="🚀 Launch Anon Earn",
+            web_app=WebAppInfo(url=f"{FRONTEND_URL}/app.html?uid={user_id}")
+        )],
         [
             InlineKeyboardButton(text="💰 Balance",        callback_data="ui_fetch_balance"),
             InlineKeyboardButton(text="📤 Invite Friends", callback_data="ui_fetch_link"),
