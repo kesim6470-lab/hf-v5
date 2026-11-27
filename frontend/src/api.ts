@@ -36,7 +36,11 @@ export class ApiError extends Error {
    state is never stale after something changes. */
 const READ_PATHS = new Set([
   "/api/me", "/api/tasks", "/api/tasks/mine", "/api/leaderboard",
-  "/api/ads/status", "/api/dailycheck/status", "/api/gate/status",
+  "/api/ads/status", "/api/dailycheck/status",
+  // NOTE: /api/gate/status is not in the 40s read cache — the gate runs
+  // on a 5-minute cycle instead (App.tsx interval + the backend's own
+  // 5-minute per-user OK cache), so membership is re-verified regularly
+  // without hammering the server or Telegram (owner order 2026-11-26).
   "/api/withdraw/history", "/api/withdrawals/recent",
   "/api/admin/stats/overview", "/api/admin/settings",
   "/api/admin/withdrawals/list", "/api/admin/tasks/list",
@@ -93,6 +97,7 @@ export interface Me {
   support_username: string;
   withdrawal_process_time: string;
   withdraw_methods: { telebirr: boolean; binance: boolean };
+  invite_show_binance: boolean;
 }
 
 export interface AdsStatus {
