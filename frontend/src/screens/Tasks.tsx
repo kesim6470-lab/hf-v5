@@ -72,10 +72,18 @@ export default function Tasks() {
   async function join(t: Task) {
     setBusy(t.id);
     try {
-      await api("/api/tasks/join", { task_id: t.id });
+      const r = await api<{ wait_seconds: number }>("/api/tasks/join", { task_id: t.id });
       // A fresh join tap clears any failed-check state, so when the
       // user comes back the button shows "Check" again.
       setRejoin((prev) => { const n = new Set(prev); n.delete(t.id); return n; });
+      // Show the countdown IMMEDIATELY (owner report 2026-11-27: the
+      // countdown never appeared — the list only reloaded long after
+      // the 5s wait had already passed). Flip this row to "waiting"
+      // with the server's wait_seconds right now; the tick effect
+      // counts it down live and auto-checks at zero.
+      setTasks((prev) => prev.map((x) => x.id === t.id ? { ...x, status: "waiting", wait_left: r.wait_seconds ?? 5 } : x));
+      loadedAtRef.current = Date.now();
+      zeroReloadedRef.current.delete(t.id);
       openTaskLink(t);
       toast("⏳ Joined — come back here, we verify automatically");
     } catch (e: any) { toast(e?.message || "Join failed"); }
@@ -252,7 +260,7 @@ export default function Tasks() {
                 <button className="btn sm" disabled={busy === t.id} onClick={() => checkBtn(t)}>{busy === t.id ? <Spinner /> : null}Check</button>
               )
             ) : (
-              <button className="btn sm" disabled={busy === t.id} onClick={() => join(t)}>
+              <button className="btn sm" disabled={busy === t.id || t.status === "waiting"} onClick={() => join(t)}>
                 {t.status === "waiting" ? `⏳ ${Math.max(0, (t.wait_left ?? 0) - Math.floor((Date.now() - loadedAtRef.current) / 1000))}s` : "Join"}
               </button>
             )}
