@@ -7210,9 +7210,18 @@ async def api_admin_tasks_create(body: AdminTaskCreateRequest):
         if not ref:
             raise HTTPException(status_code=400, detail="force_needs_channel")
         try:
-            _chat = await bot.get_chat(chat_id=ref)
-            _ch = str(_chat.id)
             _bot_id = BOT_ID or (await bot.get_me()).id
+            try:
+                _chat = await bot.get_chat(chat_id=ref)
+                _ch = str(_chat.id)
+            except Exception:
+                # get_chat throws on some channels (Telegram response-shape /
+                # aiogram deserialize errors) even when the bot IS an admin
+                # there — 2026-11-27: all 5 sponsor channels refused this
+                # way while the gate's get_chat_member checks passed. Fall
+                # back to the ref as given (@username works for public
+                # channels) and let the membership proof below decide.
+                _ch = ref
             _me = await bot.get_chat_member(chat_id=_ch, user_id=_bot_id)
             if _me.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
                 raise HTTPException(status_code=400, detail="bot_not_admin_in_channel")
@@ -7427,17 +7436,20 @@ async def api_admin_channels_check_one(body: AdminChannelCheckOneRequest):
         out["chat_title"] = chat.title or ""
         chat_ref = chat.id
     except Exception as e:
+        # get_chat throws on some channels (response-shape / deserialize
+        # errors) even when the bot IS an admin there — do not declare
+        # chat_not_found yet; prove membership directly below.
         out["error"] = str(e)[:140]
-        out["bot_status"] = "chat_not_found"
-        return out
     try:
         me = await bot.get_chat_member(chat_id=chat_ref, user_id=bot_id)
         st = me.status.value if hasattr(me.status, "value") else str(me.status)
         out["bot_status"] = st
         out["can_check"] = st in ("administrator", "creator")
+        if not out["chat_id"] and isinstance(chat_ref, int):
+            out["chat_id"] = str(chat_ref)
     except Exception as e:
-        out["bot_status"] = "not_a_member"
-        out["error"] = str(e)[:140]
+        out["bot_status"] = "chat_not_found" if out["error"] else "not_a_member"
+        out["error"] = ((out["error"] + " | " + str(e)[:100]) if out["error"] else str(e))[:140]
     return out
 
 
