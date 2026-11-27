@@ -4,7 +4,8 @@ import { ensureMonetagSdk, showAdsgram, tryMonetagFallback } from "../ads";
 import { useApp } from "../App";
 import { Shimmer, Spinner } from "../components/ui";
 
-/** Home: glowing hero balance card, withdrawals ticker, Daily Check-in
+/** Home: coin-jar hero card (stats live elsewhere: invite earnings in
+ *  the jar, team count on the team strip), withdrawals ticker, Daily Check-in
  *  (🔥, arm → ad → S2S-confirmed claim), Watch & Earn (AdsGram video with
  *  Monetag fallback + Direct Link), force-join is a hard gate in App.tsx. */
 export default function Home() {
@@ -218,15 +219,15 @@ export default function Home() {
   return (
     <section className="screen">
       <div className="hero">
-        <div className="label">💰 Total Balance</div>
+        <div className="wm">🪙</div>
+        <div className="jar-top">
+          <div className="label">🪙 My Coin Jar</div>
+          {daily?.enabled && daily.streak > 0 && <div className="chip">🔥 {daily.streak}-day streak</div>}
+        </div>
         <div className="bal">{fmt(shown)} <small>Birr</small></div>
         <div className="bar"><i style={{ width: `${Math.min(100, (me.balance / me.min_withdrawal) * 100)}%` }} /></div>
-        <div className="goal"><span>{fmt(me.balance)} / {fmt(me.min_withdrawal)} Birr to withdraw</span><span>🎯 Min {fmt(me.min_withdrawal)} Birr</span></div>
-        <div className="stat-row">
-          <div className="stat-box"><div className="n">{me.referrals}</div><div className="l">Referrals</div></div>
-          <div className="stat-box"><div className="n">{fmt(me.reward_per_referral)}</div><div className="l">Per Invite</div></div>
-          <div className="stat-box"><div className="n">{fmt(me.total_earned_refs)}</div><div className="l">Earned</div></div>
-        </div>
+        <div className="goal"><span>Saved {fmt(me.balance)} Birr</span><span>{me.balance >= me.min_withdrawal ? "🎉 Cash out is open" : `🎯 ${fmt(me.min_withdrawal - me.balance)} Birr to go — cash out opens`}</span></div>
+        <div className="jar-line">🏆 Earned from invites: <b>{fmt(me.total_earned_refs)} Birr</b></div>
       </div>
 
       {ticker.length > 0 && (
@@ -276,6 +277,15 @@ export default function Home() {
           </div>
         </>
       )}
+
+      <div className="row team-strip" onClick={() => go("invite")}>
+        <div className="tic">👥</div>
+        <div className="grow">
+          <div className="t">{me.referrals} friends in your team</div>
+          <div className="s">+{fmt(me.reward_per_referral)} Birr for every friend who joins</div>
+        </div>
+        <button className="btn sm" onClick={() => go("invite")}>Invite</button>
+      </div>
 
       <h3 className="sect">Quick Actions</h3>
       <div className="grid2">
