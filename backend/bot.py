@@ -419,6 +419,10 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('adsgram_block_id', '');
 -- screen hides disabled methods and /api/withdraw refuses them.
 INSERT OR IGNORE INTO settings (key, value) VALUES ('withdraw_telebirr_enabled', '1');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('withdraw_binance_enabled', '1');
+-- Invite/share text payout line (owner request 2026-11-27): when '0', the
+-- invite + share texts name Telebirr only. Binance Pay WITHDRAWALS are
+-- unaffected — those have their own switches above.
+INSERT OR IGNORE INTO settings (key, value) VALUES ('invite_show_binance', '1');
 -- Weekly Top 20 rewards (owner request 2026-11-26): every week the 20
 -- users with the most PAID referrals that week split a prize pool by
 -- rank percentages; the split is automatic (weekly_top_payout_loop).
@@ -2981,33 +2985,39 @@ async def _get_bot_photo_file_id() -> str | None:
     return _bot_photo_file_id
 
 
-def invite_share_text(link: str) -> str:
+def invite_share_text(link: str, show_binance: bool = True) -> str:
     """Anon Earn's own invite wording — used as PLAIN text in the
     Telegram share picker (build_invite_share_url) and mirrored by the
     Mini App Share fallback. Deliberately NOT the old checklist style:
-    gold-coin brand line, earn-loop lines, payout line, link last."""
+    gold-coin brand line, earn-loop lines, payout line, link last.
+    show_binance=False (admin setting invite_show_binance) drops
+    Binance Pay from the payout line, leaving Telebirr only."""
+    payout = ("Payouts go to Telebirr or Binance Pay.\n\n" if show_binance
+              else "Payouts go to Telebirr.\n\n")
     return (
         "🪙 ANON EARN — Birr, little by little, every day.\n\n"
         "🎬 clips I watch turn into Birr\n"
         "🎯 small missions, quick rewards\n"
         "🔥 a daily streak that keeps paying\n"
         "👥 friends I bring in earn me more\n\n"
-        "Payouts go to Telebirr or Binance Pay.\n\n"
+        f"{payout}"
         "Your turn — start free 👇\n"
         f"{link}"
     )
 
 
-def invite_card_caption() -> str:
+def invite_card_caption(show_binance: bool = True) -> str:
     """HTML twin of invite_share_text() for the invite CARD (photo +
     caption + Join button) sent via the inline picker / share_card."""
+    payout = ("Payouts go to <b>Telebirr</b> or <b>Binance Pay</b>.\n\n"
+              if show_binance else "Payouts go to <b>Telebirr</b>.\n\n")
     return (
         "🪙 <b>ANON EARN — Birr, little by little, every day.</b>\n\n"
         "🎬 clips I watch turn into Birr\n"
         "🎯 small missions, quick rewards\n"
         "🔥 a daily streak that keeps paying\n"
         "👥 friends I bring in earn me more\n\n"
-        "Payouts go to <b>Telebirr</b> or <b>Binance Pay</b>.\n\n"
+        f"{payout}"
         "Tap below and start free — it takes a minute 👇"
     )
 
@@ -3015,7 +3025,8 @@ def invite_card_caption() -> str:
 async def _build_invite_card(uid: int):
     uname = BOT_USERNAME or (await bot.get_me()).username
     referral_link = f"https://t.me/{uname}?start={uid}"
-    caption = invite_card_caption()
+    show_binance = (await DataEngine.get_setting("invite_show_binance", "1")) == "1"
+    caption = invite_card_caption(show_binance)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🪙 Start on Anon Earn — Free", url=referral_link)],
     ])
@@ -3362,7 +3373,7 @@ async def process_link_generation(callback: CallbackQuery):
     me   = await bot.get_me()
     rate = float(await DataEngine.get_setting("reward_per_referral", "10"))
     link = f"https://t.me/{me.username}?start={uid}"
-    share_url = build_invite_share_url(uid) or (
+    share_url = await build_invite_share_url(uid) or (
         "https://t.me/share/url?url=&text=" + urllib.parse.quote(link, safe="")
     )
     rows = [
@@ -3698,7 +3709,7 @@ def generate_app_webapp_button(user_id: int, admin: bool = False) -> InlineKeybo
         InlineKeyboardButton(text="📱 Open Anon Earn", web_app=WebAppInfo(url=url))
     ]])
 
-def build_invite_share_url(user_id: int) -> str | None:
+async def build_invite_share_url(user_id: int) -> str | None:
     """
     Telegram "send to…" picker URL carrying the exact same invite text the
     Mini App's Share button sends (see shareLink() in frontend/app.html).
@@ -3709,7 +3720,8 @@ def build_invite_share_url(user_id: int) -> str | None:
     if not BOT_USERNAME:
         return None
     link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-    text = invite_share_text(link)
+    show_binance = (await DataEngine.get_setting("invite_show_binance", "1")) == "1"
+    text = invite_share_text(link, show_binance)
     return "https://t.me/share/url?url=&text=" + urllib.parse.quote(text, safe="")
 
 # Share button label: plain circular-arrow glyph instead of an emoji.
@@ -5808,6 +5820,7 @@ async def api_me(body: ApiBase):
             "telebirr": (await DataEngine.get_setting("withdraw_telebirr_enabled", "1")) == "1",
             "binance": (await DataEngine.get_setting("withdraw_binance_enabled", "1")) == "1",
         },
+        "invite_show_binance": (await DataEngine.get_setting("invite_show_binance", "1")) == "1",
     }
 
 
@@ -7686,6 +7699,7 @@ async def api_admin_settings(body: ApiBase):
         # Withdrawal method switches (owner request 2026-11-26)
         "withdraw_telebirr_enabled": (await DataEngine.get_setting("withdraw_telebirr_enabled", "1")) == "1",
         "withdraw_binance_enabled": (await DataEngine.get_setting("withdraw_binance_enabled", "1")) == "1",
+        "invite_show_binance": (await DataEngine.get_setting("invite_show_binance", "1")) == "1",
     }
 
 
@@ -7723,6 +7737,10 @@ class AdminSettingsUpdateRequest(ApiBase):
     # Withdrawal method switches (owner request 2026-11-26)
     withdraw_telebirr_enabled: bool = True
     withdraw_binance_enabled: bool = True
+    # Invite/share text payout line (owner request 2026-11-27). Optional
+    # (None = leave unchanged) so a frontend that doesn't send it can't
+    # reset it on an unrelated settings save.
+    invite_show_binance: bool | None = None
     # Optional (None = leave unchanged), like multi_account_detect_enabled
     # below: the Mini App's saveSettings() never sends these two fields,
     # and the old non-Optional defaults (True / "[]") were written back on
@@ -7788,6 +7806,8 @@ async def api_admin_settings_update(body: AdminSettingsUpdateRequest):
     await DataEngine.set_setting("support_username", body.support_username.strip().lstrip("@"))
     await DataEngine.set_setting("withdraw_telebirr_enabled", "1" if body.withdraw_telebirr_enabled else "0")
     await DataEngine.set_setting("withdraw_binance_enabled", "1" if body.withdraw_binance_enabled else "0")
+    if body.invite_show_binance is not None:
+        await DataEngine.set_setting("invite_show_binance", "1" if body.invite_show_binance else "0")
     if body.ticker_enabled is not None:
         await DataEngine.set_setting("ticker_enabled", "1" if body.ticker_enabled else "0")
     if body.ticker_custom_names is not None:
