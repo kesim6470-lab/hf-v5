@@ -94,10 +94,10 @@ export default function Withdraw() {
 
   return (
     <section className="screen">
-      <h3 className="sect">💸 Cash Out</h3>
+      <h3 className="sect">💸 Withdraw</h3>
       <div className="card">
         <div style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600 }}>
-          Your Birr: <b style={{ color: "var(--accent)" }}>{fmt(me.balance)} Birr</b> · cash out from {fmt(me.min_withdrawal)} Birr
+          Balance: <b style={{ color: "var(--accent)" }}>{fmt(me.balance)} Birr</b> · Min {fmt(me.min_withdrawal)} Birr
         </div>
         <div className="seg">
           {wm.telebirr && <button className={m === "telebirr" ? "active" : ""} onClick={() => setMethod("telebirr")}><TelebirrIcon /> Telebirr</button>}
@@ -120,11 +120,11 @@ export default function Withdraw() {
             {usdt > 0 && <div style={{ color: "var(--muted)", fontSize: 13 }}>≈ {usdt.toFixed(2)} USDT at {fmt(me.usdt_rate)} Birr/USDT</div>}
           </>
         )}
-        {!noneEnabled && <button className="btn" disabled={busy} onClick={submit}>{busy ? <><Spinner />Sending…</> : "💸 Cash Out"}</button>}
+        {!noneEnabled && <button className="btn" disabled={busy} onClick={submit}>{busy ? <><Spinner />Sending…</> : "💸 Submit withdrawal"}</button>}
       </div>
 
-      <h3 className="sect">🧾 Past Cash Outs</h3>
-      {history.length === 0 ? <div className="empty">No cash outs yet</div> :
+      <h3 className="sect">🧾 History</h3>
+      {history.length === 0 ? <div className="empty">No withdrawals yet</div> :
         history.map((w) => (
           <div className="row" key={w.id}>
             <div className="grow">
