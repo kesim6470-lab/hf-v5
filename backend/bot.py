@@ -7603,6 +7603,61 @@ async def api_admin_proofs_manual(body: AdminManualProofRequest):
     return {"ok": True, "message_id": msg.message_id}
 
 
+class AdminManualRequestRequest(ApiBase):
+    name: str
+    amount: float
+    user_id: int = 0
+    method: str = "telebirr"
+
+
+@api_app.post("/api/admin/proofs/manual-request")
+async def api_admin_proofs_manual_request(body: AdminManualRequestRequest):
+    """Manual request post (owner request 2026-11-28): the BOT posts a
+    NEW WITHDRAWAL REQUEST message to the proof channel in the exact
+    format of an automatic withdrawal request (same text, photo and
+    🚀 Start Earn button as dispatch_withdrawal_core), so the admin can
+    then answer it with the manual completed proof (proofs/manual) and
+    see the full request → completed flow in the channel."""
+    user = await _authenticate(body)
+    _require_admin(user)
+    if not PAYMENT_LOG_CHANNEL:
+        raise HTTPException(status_code=400, detail="proof_channel_not_set")
+    if not body.name.strip() or body.amount <= 0:
+        raise HTTPException(status_code=400, detail="name_amount_required")
+    is_binance = body.method == "binance"
+    me = await bot.get_me()
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🚀 Start Earn", url=f"https://t.me/{me.username}")
+    ]])
+    recipient_line = (
+        f"🆔 <b>Binance UID:</b> <code>{sanitize_html(body.name.strip())}</code>\n\n"
+        if is_binance else
+        f"👤 <b>Account Holder Name:</b> {sanitize_html(body.name.strip())}\n\n"
+    )
+    uid_line = f"🆔 <b>User ID:</b> <code>{body.user_id}</code>\n\n" if body.user_id else ""
+    txt = (
+        f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📥 <b>NEW WITHDRAWAL REQUEST</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"{recipient_line}"
+        f"{uid_line}"
+        f"💰 <b>Requested Amount:</b> ETB {body.amount:.2f}\n\n"
+        f"📱 <b>Method:</b> {'Binance Pay' if is_binance else 'Telebirr'}\n\n"
+        f"📊 <b>Status:</b> Pending Verification ⏳\n\n"
+        f"⏰ <b>Timestamp:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━"
+    )
+    try:
+        if is_binance:
+            msg = await bot.send_message(PAYMENT_LOG_CHANNEL, txt, reply_markup=kb)
+        else:
+            msg = await _send_proof_photo(PAYMENT_LOG_CHANNEL, txt, reply_markup=kb)
+    except Exception as e:
+        logger.error(f"Manual Request Post Error: {e}")
+        raise HTTPException(status_code=502, detail="post_failed")
+    return {"ok": True, "message_id": msg.message_id}
+
+
 # ── /api/admin/users/* ────────────────────────────────────────────────────
 class AdminUserIdRequest(ApiBase):
     user_id: int
