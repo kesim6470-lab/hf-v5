@@ -3,7 +3,11 @@ import { api, fmt, tg, type Task } from "../api";
 import { useApp } from "../App";
 import { Spinner } from "../components/ui";
 
-const ICONS = ["📣", "👥", "🐦", "🎬", "⭐", "🎁"];
+// Task rows carry the owner's chosen icon: two arms locked in an
+// arm-wrestling grip on a table, one from the left, one from the
+// right (owner-approved image 2026-11-27; the old rotating emoji set
+// included the Twitter bird 🐦, which made no sense on Telegram).
+const TASK_ICON = "/task-icon.png";
 
 /** Tasks: join → wait → check → claim for auto tasks; screenshot upload
  *  for manual tasks; My Tasks (escrow status + cancel/refund); and the
@@ -226,9 +230,9 @@ export default function Tasks() {
       {view === "all" && (
         loading && tasks.length === 0 ? <div className="empty"><Spinner /> Loading tasks…</div> :
         tasks.length === 0 ? <div className="empty">No tasks right now</div> :
-        tasks.map((t, i) => (
+        tasks.map((t) => (
           <div className="row" key={t.id}>
-            <div className="tic">{ICONS[i % ICONS.length]}</div>
+            <div className="tic"><img src={TASK_ICON} alt="" /></div>
             <div className="grow">
               <div className="t">{t.title}</div>
               <div className="s">
