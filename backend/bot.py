@@ -7190,6 +7190,7 @@ async def api_admin_tasks_create(body: AdminTaskCreateRequest):
     if not body.title.strip():
         raise HTTPException(status_code=400, detail="title_required")
     _ch = body.channel_id.strip()
+    _type = body.task_type
     if body.task_type == "force":
         # A force task is only real if the bot can look members up in
         # the channel. Resolve the ref from channel_id, else from the
@@ -7209,33 +7210,38 @@ async def api_admin_tasks_create(body: AdminTaskCreateRequest):
                 ref = link if (link.startswith("@") or link.lstrip("-").isdigit()) else f"@{link}"
         if not ref:
             raise HTTPException(status_code=400, detail="force_needs_channel")
+        _bot_id = BOT_ID or (await bot.get_me()).id
         try:
-            _bot_id = BOT_ID or (await bot.get_me()).id
-            try:
-                _chat = await bot.get_chat(chat_id=ref)
-                _ch = str(_chat.id)
-            except Exception:
-                # get_chat throws on some channels (Telegram response-shape /
-                # aiogram deserialize errors) even when the bot IS an admin
-                # there — 2026-11-27: all 5 sponsor channels refused this
-                # way while the gate's get_chat_member checks passed. Fall
-                # back to the ref as given (@username works for public
-                # channels) and let the membership proof below decide.
-                _ch = ref
-            _me = await bot.get_chat_member(chat_id=_ch, user_id=_bot_id)
-            if _me.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
-                raise HTTPException(status_code=400, detail="bot_not_admin_in_channel")
-        except HTTPException:
-            raise
+            _chat = await bot.get_chat(chat_id=ref)
+            _ch = str(_chat.id)
         except Exception:
-            raise HTTPException(status_code=400, detail="bot_not_admin_in_channel")
+            # get_chat throws on some channels (Telegram response-shape /
+            # aiogram deserialize errors) even when the bot IS an admin
+            # there — 2026-11-27: all 5 sponsor channels refused this
+            # way while the gate's get_chat_member checks passed. Fall
+            # back to the ref as given (@username works for public
+            # channels) and let the membership proof below decide.
+            _ch = ref
+        try:
+            _me = await bot.get_chat_member(chat_id=_ch, user_id=_bot_id)
+            _admin_ok = _me.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR)
+        except Exception:
+            _admin_ok = False
+        if not _admin_ok:
+            # Owner order 2026-11-27: a channel where the bot is NOT an
+            # admin must still be addable — never refuse. The task is
+            # created in fake-join mode (the gate's "No admin" idea):
+            # the user taps Join, a short timer runs, then they claim.
+            # It shows as type "fake" in the admin list, so the mode is
+            # visible, never silent.
+            _type = "fake"
     task_id = await DataEngine.create_task(
         body.title.strip(), _ch, body.invite_link.strip(),
-        body.task_type, body.reward,
+        _type, body.reward,
         instructions=body.instructions.strip(),
         screenshot_count=max(1, min(2, int(body.screenshot_count or 1))),
     )
-    return {"ok": True, "task_id": task_id}
+    return {"ok": True, "task_id": task_id, "task_type": _type}
 
 
 class AdminIdRequest(ApiBase):
