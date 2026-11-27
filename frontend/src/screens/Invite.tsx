@@ -52,16 +52,14 @@ export default function Invite() {
 
   return (
     <section className="screen">
-      <h3 className="sect">👥 Invite Friends</h3>
-      <div className="stat-row" style={{ marginTop: 0 }}>
-        <div className="stat-box"><div className="n">{me.referrals}</div><div className="l">Invited</div></div>
-        <div className="stat-box"><div className="n">{me.tier2_referrals}</div><div className="l">Tier-2</div></div>
-        <div className="stat-box"><div className="n">{fmt(me.total_earned_refs)}</div><div className="l">Birr earned</div></div>
-      </div>
-      <div className="card" style={{ marginTop: 14 }}>
+      <h3 className="sect">📤 Share & Earn</h3>
+      <div className="card">
         <div style={{ fontSize: 14, lineHeight: 1.55 }}>
           Earn <b>{fmt(me.reward_per_referral)} Birr</b> for every friend who joins with your
           link and completes verification.
+        </div>
+        <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600, marginTop: 10 }}>
+          👥 {me.referrals} invited · {me.tier2_referrals} tier-2 · 🏆 {fmt(me.total_earned_refs)} Birr earned so far
         </div>
       </div>
       <Btn className="btn" style={{ marginTop: 14, width: "100%" }} onClick={inviteFriends}>
@@ -70,7 +68,7 @@ export default function Invite() {
       <div className="empty" style={{ marginTop: 8 }}>
         Pick a friend or group, then tap the Anon Earn card to send it there.
       </div>
-      <h3 className="sect">🔗 Your Referral Link</h3>
+      <h3 className="sect">🔗 Your Link</h3>
       <div className="ref-box">{referralLink}</div>
       <Btn className="btn ghost" onClick={() => { navigator.clipboard?.writeText(referralLink); toast("Link copied 📋"); }}>
         📋 Copy link
