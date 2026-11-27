@@ -28,6 +28,10 @@ export default function Tasks() {
   // tap (it chains the check invisibly when needed). `verified` holds
   // task ids whose membership this session has already proven.
   const [verified, setVerified] = useState<Set<number>>(new Set());
+  // Tasks whose last Check failed (not a member): the button flips
+  // back to "Join" (owner's flow: Join → Check → Claim, and a failed
+  // Check returns the user to Join).
+  const [rejoin, setRejoin] = useState<Set<number>>(new Set());
   const [, setTick] = useState(0);
   const loadedAtRef = useRef(0);
   const zeroReloadedRef = useRef<Set<number>>(new Set());
@@ -69,23 +73,27 @@ export default function Tasks() {
     setBusy(t.id);
     try {
       await api("/api/tasks/join", { task_id: t.id });
+      // A fresh join tap clears any failed-check state, so when the
+      // user comes back the button shows "Check" again.
+      setRejoin((prev) => { const n = new Set(prev); n.delete(t.id); return n; });
       openTaskLink(t);
       toast("⏳ Joined — come back here, we verify automatically");
     } catch (e: any) { toast(e?.message || "Join failed"); }
     setBusy(null);
   }
 
-  // Owner's button flow (2026-11-27): after joining, the button still
-  // says "Join". Tapping it checks membership — if the user is NOT in
-  // the channel it sends them back to join (re-opens the channel); if
-  // they ARE in, the button flips to "Claim".
-  async function joinOrVerify(t: Task) {
+  // Owner's button flow (2026-11-27): Join → Check → Claim. The
+  // "Check" button verifies membership — if the user IS in the
+  // channel it flips to "Claim"; if NOT, the button flips back to
+  // "Join" and the channel re-opens so they can join properly.
+  async function checkBtn(t: Task) {
     setBusy(t.id);
     const ok = await checkSilent(t);
     if (ok) {
       toast("✅ Verified — tap Claim");
     } else {
       toast("❌ You haven't joined yet — opening the channel");
+      setRejoin((prev) => new Set(prev).add(t.id));
       openTaskLink(t);
     }
     setBusy(null);
@@ -221,7 +229,7 @@ export default function Tasks() {
                   : t.status === "review" ? "📸 Under review"
                   : t.status === "rejected" ? "❌ Submission rejected"
                   : t.status === "completed" ? "✔ Completed"
-                  : t.status === "claimable" ? (verified.has(t.id) ? "✔ Verified — claim your reward" : "Tap Join — if you're in, it becomes Claim")
+                  : t.status === "claimable" ? (verified.has(t.id) ? "✔ Verified — claim your reward" : rejoin.has(t.id) ? "You haven't joined yet — tap Join" : "Joined? Tap Check to verify")
                   : "Join, then claim"}
               </div>
             </div>
@@ -238,8 +246,10 @@ export default function Tasks() {
             ) : t.status === "claimable" ? (
               verified.has(t.id) ? (
                 <button className="btn sm" disabled={busy === t.id} onClick={() => claim(t)}>{busy === t.id ? <Spinner /> : null}Claim</button>
+              ) : rejoin.has(t.id) ? (
+                <button className="btn sm" disabled={busy === t.id} onClick={() => join(t)}>{busy === t.id ? <Spinner /> : null}Join</button>
               ) : (
-                <button className="btn sm" disabled={busy === t.id} onClick={() => joinOrVerify(t)}>{busy === t.id ? <Spinner /> : null}Join</button>
+                <button className="btn sm" disabled={busy === t.id} onClick={() => checkBtn(t)}>{busy === t.id ? <Spinner /> : null}Check</button>
               )
             ) : (
               <button className="btn sm" disabled={busy === t.id} onClick={() => join(t)}>
