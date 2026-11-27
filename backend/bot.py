@@ -3283,7 +3283,7 @@ async def process_start_command(message: Message, state: FSMContext):
         return
 
     if await DataEngine.is_verified(uid):
-        return await message.answer("👋 <b>Good to see you again!</b>\nYour Anon Earn menu is ready — pick what you need:", reply_markup=generate_dashboard_matrix(uid))
+        return await message.answer(await dashboard_card_text(uid, message.from_user.first_name), reply_markup=generate_dashboard_matrix(uid))
 
     # ── Clean up any stale, unfinished verification widget ────────────────
     # If the user restarts the bot (or taps an old shared /start link)
@@ -3320,7 +3320,7 @@ async def process_navigation_home(callback: CallbackQuery, state: FSMContext):
         if not await enforce_membership_gate(callback, uid):
             return
     await callback.message.edit_text(
-        "🏠 <b>Main Menu</b>",
+        await dashboard_card_text(uid, callback.from_user.first_name),
         reply_markup=generate_dashboard_matrix(uid)
     )
 
@@ -3744,23 +3744,46 @@ async def get_withdrawal_process_text() -> str:
         unit = "hours"
     return f"{val} {unit}"
 
+async def dashboard_card_text(user_id: int, first_name: str = "") -> str:
+    """The bot-chat home card: a 'coin jar' summary (owner redesign
+    2026-11-27 — deliberately unlike the legacy dashboard: the card
+    itself carries the user's numbers instead of a bare menu title)."""
+    acc = await DataEngine.get_user(user_id)
+    bal = float(acc["balance"]) if acc else 0.0
+    team, _ = await DataEngine.get_paid_referral_metrics(user_id)
+    min_w = float(await DataEngine.get_setting("min_withdrawal", "50"))
+    name = sanitize_html(first_name or (acc["full_name"] if acc else ""))
+    lines = ["🪙 <b>ANON EARN</b> — your coin jar", "━━━━━━━━━━━━━━"]
+    if name:
+        lines += [f"👋 Welcome back, <b>{name}</b>", ""]
+    lines.append(f"💰 In your jar: <b>{bal:,.2f} Birr</b>")
+    lines.append(f"👥 Your team: <b>{team}</b> friends")
+    if bal >= min_w:
+        lines.append("🎉 Your jar is full enough — you can cash out!")
+    else:
+        lines.append(f"🎯 <b>{min_w - bal:,.2f} Birr</b> more and you can cash out")
+    lines += ["", "Coins drop in little by little — keep the streak alive 🔥"]
+    return "\n".join(lines)
+
+
 def generate_dashboard_matrix(user_id: int) -> InlineKeyboardMarkup:
-    # Anon Earn's own menu style (not the legacy layout): earn actions first.
-    # Layout:  [        Open Anon Earn        ]   <- full width
-    #          [ Balance ]  [ Withdraw ]          <- money row
-    #          [  Team   ]  [ Invite Link ]       <- growth row
+    # Coin-jar dashboard buttons (owner redesign 2026-11-27): launch,
+    # money+team row, then a full-width Invite — the balance itself
+    # lives on the card text now, so there is no Balance button.
+    # Layout:  [        Launch Anon Earn       ]   <- full width
+    #          [ Cash Out ]  [   My Team   ]         <- money row
+    #          [        Invite Friends        ]   <- full width
     rows = [
         [InlineKeyboardButton(
-            text="🚀 Open Anon Earn",
+            text="🚀 Launch Anon Earn",
             web_app=WebAppInfo(url=f"{FRONTEND_URL}/app.html?uid={user_id}")
         )],
         [
-            InlineKeyboardButton(text="💰 Balance",  callback_data="ui_fetch_balance"),
-            InlineKeyboardButton(text="💸 Withdraw", callback_data="ui_initiate_withdrawal"),
+            InlineKeyboardButton(text="💸 Cash Out", callback_data="ui_initiate_withdrawal"),
+            InlineKeyboardButton(text="👥 My Team",  callback_data="ui_fetch_referrals"),
         ],
         [
-            InlineKeyboardButton(text="👥 Team",        callback_data="ui_fetch_referrals"),
-            InlineKeyboardButton(text="🔗 Invite Link", callback_data="ui_fetch_link"),
+            InlineKeyboardButton(text="📤 Invite Friends", callback_data="ui_fetch_link"),
         ],
     ]
     if evaluate_admin_access(user_id):
