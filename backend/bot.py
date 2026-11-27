@@ -4035,7 +4035,7 @@ async def dispatch_withdrawal_core(
         InlineKeyboardButton(text="🚀 Start Earn", url=f"https://t.me/{me.username}")
     ]])
 
-    method_label = "Binance Pay" if is_binance else "Telebirr Portal"
+    method_label = "Binance Pay" if is_binance else "Telebirr"
     recipient_line = (
         f"🆔 <b>Binance UID:</b> <code>{sanitize_html(binance_uid)}</code>\n\n"
         if is_binance else
@@ -4334,13 +4334,17 @@ async def approve_withdrawal_core(tid: int, notify_mode: str = "both") -> dict:
     proof_post_on = (await DataEngine.get_setting("proof_post_enabled", "1")) == "1"
     if proof_post_on and PAYMENT_LOG_CHANNEL and ticket["channel_post_id"]:
         txt = (
-            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
             f"✅ <b>WITHDRAWAL COMPLETED</b>\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
             f"👤 <b>{recipient_label}:</b> {sanitize_html(recipient_value)}\n\n"
+            f"🆔 <b>User ID:</b> <code>{ticket['user_id']}</code>\n\n"
             f"💰 <b>Amount:</b> ETB {ticket['amount']:.2f}\n\n"
-            f"🚀 <b>Operational Registry:</b> Success ✅\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━"
+            f"📱 <b>Method:</b> {'Binance Pay' if is_binance else 'Telebirr'}\n\n"
+            f"📊 <b>Status:</b> Paid ✅\n\n"
+            f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"<b>Anon Earn</b>"
         )
         try:
             if is_binance:
