@@ -422,7 +422,14 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('withdraw_binance_enabled', 
 -- Invite/share text payout line (owner request 2026-11-27): when '0', the
 -- invite + share texts name Telebirr only. Binance Pay WITHDRAWALS are
 -- unaffected — those have their own switches above.
-INSERT OR IGNORE INTO settings (key, value) VALUES ('invite_show_binance', '1');
+-- Default is '0' (owner: Telebirr only for now, 2026-11-27 ~10:32).
+INSERT OR IGNORE INTO settings (key, value) VALUES ('invite_show_binance', '0');
+-- One-time flip: the first deploy seeded '1' before the owner chose the
+-- default; force the live row to '0' once, then never again (the marker
+-- row makes later boots skip this, so Admin toggles persist).
+UPDATE settings SET value = '0' WHERE key = 'invite_show_binance'
+  AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'invite_show_binance_default_v2');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('invite_show_binance_default_v2', 'done');
 -- Weekly Top 20 rewards (owner request 2026-11-26): every week the 20
 -- users with the most PAID referrals that week split a prize pool by
 -- rank percentages; the split is automatic (weekly_top_payout_loop).
@@ -3025,7 +3032,7 @@ def invite_card_caption(show_binance: bool = True) -> str:
 async def _build_invite_card(uid: int):
     uname = BOT_USERNAME or (await bot.get_me()).username
     referral_link = f"https://t.me/{uname}?start={uid}"
-    show_binance = (await DataEngine.get_setting("invite_show_binance", "1")) == "1"
+    show_binance = (await DataEngine.get_setting("invite_show_binance", "0")) == "1"
     caption = invite_card_caption(show_binance)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🪙 Start on Anon Earn — Free", url=referral_link)],
@@ -3720,7 +3727,7 @@ async def build_invite_share_url(user_id: int) -> str | None:
     if not BOT_USERNAME:
         return None
     link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-    show_binance = (await DataEngine.get_setting("invite_show_binance", "1")) == "1"
+    show_binance = (await DataEngine.get_setting("invite_show_binance", "0")) == "1"
     text = invite_share_text(link, show_binance)
     return "https://t.me/share/url?url=&text=" + urllib.parse.quote(text, safe="")
 
@@ -5820,7 +5827,7 @@ async def api_me(body: ApiBase):
             "telebirr": (await DataEngine.get_setting("withdraw_telebirr_enabled", "1")) == "1",
             "binance": (await DataEngine.get_setting("withdraw_binance_enabled", "1")) == "1",
         },
-        "invite_show_binance": (await DataEngine.get_setting("invite_show_binance", "1")) == "1",
+        "invite_show_binance": (await DataEngine.get_setting("invite_show_binance", "0")) == "1",
     }
 
 
@@ -7699,7 +7706,7 @@ async def api_admin_settings(body: ApiBase):
         # Withdrawal method switches (owner request 2026-11-26)
         "withdraw_telebirr_enabled": (await DataEngine.get_setting("withdraw_telebirr_enabled", "1")) == "1",
         "withdraw_binance_enabled": (await DataEngine.get_setting("withdraw_binance_enabled", "1")) == "1",
-        "invite_show_binance": (await DataEngine.get_setting("invite_show_binance", "1")) == "1",
+        "invite_show_binance": (await DataEngine.get_setting("invite_show_binance", "0")) == "1",
     }
 
 
