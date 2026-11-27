@@ -4,8 +4,8 @@ import { ensureMonetagSdk, showAdsgram, tryMonetagFallback } from "../ads";
 import { useApp } from "../App";
 import { Shimmer, Spinner } from "../components/ui";
 
-/** Home: coin-jar hero card (stats live elsewhere: invite earnings in
- *  the jar, team count on the team strip), withdrawals ticker, Daily Check-in
+/** Home: Birr hero card (stats live elsewhere: invite earnings in
+ *  the card, team count on the team strip), withdrawals ticker, Daily Check-in
  *  (🔥, arm → ad → S2S-confirmed claim), Watch & Earn (AdsGram video with
  *  Monetag fallback + Direct Link), force-join is a hard gate in App.tsx. */
 export default function Home() {
@@ -219,9 +219,8 @@ export default function Home() {
   return (
     <section className="screen">
       <div className="hero">
-        <div className="wm">🪙</div>
         <div className="jar-top">
-          <div className="label">🪙 My Coin Jar</div>
+          <div className="label">💵 My Birr</div>
           {daily?.enabled && daily.streak > 0 && <div className="chip">🔥 {daily.streak}-day streak</div>}
         </div>
         <div className="bal">{fmt(shown)} <small>Birr</small></div>
