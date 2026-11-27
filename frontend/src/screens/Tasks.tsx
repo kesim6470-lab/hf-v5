@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fmt, tg, type Task } from "../api";
 import { useApp } from "../App";
 import { Spinner } from "../components/ui";
@@ -22,12 +22,22 @@ export default function Tasks() {
   // has actually completed with zero rows.
   const [loading, setLoading] = useState(true);
   const [mineLoading, setMineLoading] = useState(true);
+  // PRO CHECK FLOW (owner order 2026-11-27: "the check is tedious —
+  // make it pro"): membership verifies ITSELF when the user comes back
+  // from the channel, the wait counts down live, and Claim is a single
+  // tap (it chains the check invisibly when needed). `verified` holds
+  // task ids whose membership this session has already proven.
+  const [verified, setVerified] = useState<Set<number>>(new Set());
+  const [, setTick] = useState(0);
+  const loadedAtRef = useRef(0);
+  const zeroReloadedRef = useRef<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     try {
       const r = await api<{ tasks: Task[]; user_task_config: any }>("/api/tasks");
       setTasks(r.tasks || []);
       setCfg(r.user_task_config);
+      loadedAtRef.current = Date.now();
     } catch (e: any) { toast(e?.message || "Couldn't load tasks"); }
     finally { setLoading(false); }
   }, [toast]);
@@ -57,30 +67,71 @@ export default function Tasks() {
         else if (tg?.openLink) tg.openLink(link);
         else window.open(link, "_blank");
       }
-      toast("⏳ Joined — wait a few seconds, then Check");
-      setTimeout(load, 6000);
+      toast("⏳ Joined — come back here, we verify automatically");
     } catch (e: any) { toast(e?.message || "Join failed"); }
     setBusy(null);
   }
 
-  async function check(t: Task) {
-    setBusy(t.id);
+  // Silent membership proof — no toasts, returns true only when the
+  // server confirms membership. Used by the auto-check on return and
+  // chained inside Claim, so the user never taps a "Check" button.
+  const checkSilent = useCallback(async (t: Task): Promise<boolean> => {
     try {
       await api("/api/tasks/check", { task_id: t.id });
-      toast("✅ Verified — now Claim your reward");
-      load();
-    } catch (e: any) {
-      if (String(e?.message).startsWith("wait:")) toast(`⏳ Wait ${e.message.split(":")[1]}s more`);
-      else if (e?.message === "not_member") toast("❌ You haven't joined yet");
-      else if (e?.message === "check_failed") toast("⚠️ Couldn't verify membership — try again in a moment");
-      else toast(e?.message || "Check failed");
-    }
-    setBusy(null);
-  }
+      setVerified((prev) => new Set(prev).add(t.id));
+      return true;
+    } catch { return false; }
+  }, []);
+
+  // Auto-check: whenever the app returns to the foreground, prove every
+  // joined-but-unverified task in parallel; announce once if any pass.
+  useEffect(() => {
+    const onVis = async () => {
+      if (document.visibilityState !== "visible") return;
+      const pending = tasks.filter((t) => t.task_type !== "manual" && t.status === "claimable" && !verified.has(t.id));
+      if (pending.length === 0) return;
+      const results = await Promise.all(pending.map((t) => checkSilent(t)));
+      if (results.some(Boolean)) toast("✅ Verified — tap Claim for your reward");
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [tasks, verified, checkSilent, toast]);
+
+  // Live wait countdown: tick once a second while any task is waiting,
+  // so the seconds run down smoothly on screen; when one reaches zero,
+  // reload once and auto-check it.
+  useEffect(() => {
+    if (!tasks.some((t) => t.status === "waiting")) return;
+    const iv = setInterval(() => {
+      setTick((x) => x + 1);
+      const elapsed = Math.floor((Date.now() - loadedAtRef.current) / 1000);
+      const done = tasks.filter((t) => t.status === "waiting" && (t.wait_left ?? 0) - elapsed <= 0 && !zeroReloadedRef.current.has(t.id));
+      if (done.length > 0) {
+        done.forEach((t) => zeroReloadedRef.current.add(t.id));
+        load().then(() => { done.forEach((t) => { void checkSilent(t); }); });
+      }
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [tasks, load, checkSilent]);
 
   async function claim(t: Task) {
     setBusy(t.id);
     try {
+      // One-tap claim: if this session hasn't verified the task yet,
+      // run the membership check invisibly first, then claim.
+      if (!verified.has(t.id)) {
+        const ok = await checkSilent(t);
+        if (!ok) {
+          try { await api("/api/tasks/check", { task_id: t.id }); }
+          catch (e: any) {
+            if (String(e?.message).startsWith("wait:")) toast(`⏳ Wait ${e.message.split(":")[1]}s more`);
+            else if (e?.message === "not_member") toast("❌ You haven't joined yet");
+            else if (e?.message === "check_failed") toast("⚠️ Couldn't verify membership — try again in a moment");
+            else toast(e?.message || "Check failed");
+            setBusy(null); return;
+          }
+        }
+      }
       const r = await api<{ reward: number }>("/api/tasks/claim", { task_id: t.id });
       toast(`+${fmt(r.reward)} Birr 🎉`);
       tg?.HapticFeedback?.notificationOccurred("success");
@@ -147,10 +198,12 @@ export default function Tasks() {
               <div className="t">{t.title}</div>
               <div className="s">
                 {t.task_type === "manual" ? (t.instructions || "Screenshot proof task")
-                  : t.status === "waiting" ? `⏳ Wait ${t.wait_left ?? 0}s after joining`
+                  : t.status === "waiting" ? `⏳ Wait ${Math.max(0, (t.wait_left ?? 0) - Math.floor((Date.now() - loadedAtRef.current) / 1000))}s after joining`
                   : t.status === "review" ? "📸 Under review"
                   : t.status === "rejected" ? "❌ Submission rejected"
-                  : t.status === "completed" ? "✔ Completed" : "Join, then claim"}
+                  : t.status === "completed" ? "✔ Completed"
+                  : t.status === "claimable" ? (verified.has(t.id) ? "✔ Verified — claim your reward" : "Joined — one tap to claim")
+                  : "Join, then claim"}
               </div>
             </div>
             <div className="reward">+{fmt(t.reward)}</div>
@@ -164,13 +217,10 @@ export default function Tasks() {
             ) : t.status === "completed" ? (
               <button className="btn sm" disabled>✔ Done</button>
             ) : t.status === "claimable" ? (
-              <>
-                <button className="btn sm ghost" disabled={busy === t.id} onClick={() => check(t)}>{busy === t.id ? <Spinner /> : null}Check</button>
-                <button className="btn sm" disabled={busy === t.id} onClick={() => claim(t)}>{busy === t.id ? <Spinner /> : null}Claim</button>
-              </>
+              <button className="btn sm" disabled={busy === t.id} onClick={() => claim(t)}>{busy === t.id ? <Spinner /> : null}{verified.has(t.id) ? "Claim" : "Verify & Claim"}</button>
             ) : (
               <button className="btn sm" disabled={busy === t.id} onClick={() => join(t)}>
-                {t.status === "waiting" ? `⏳ ${t.wait_left ?? 0}s` : "Join"}
+                {t.status === "waiting" ? `⏳ ${Math.max(0, (t.wait_left ?? 0) - Math.floor((Date.now() - loadedAtRef.current) / 1000))}s` : "Join"}
               </button>
             )}
           </div>
