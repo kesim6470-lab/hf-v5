@@ -57,9 +57,9 @@ export default function Top() {
   return (
     <section className="screen">
       <div style={{ textAlign: "center", margin: "6px 0 16px" }}>
-        <div style={{ fontSize: 30, fontWeight: 900 }}>🏆 Weekly Top 20</div>
+        <div style={{ fontSize: 30, fontWeight: 900 }}>🏆 Weekly Champions</div>
         <div style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600, marginTop: 4 }}>
-          Invite this week, finish in the Top 20, and your prize lands automatically!
+          The week's 20 best inviters split the prize pool — paid automatically on Monday.
         </div>
       </div>
 
