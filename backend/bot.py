@@ -3745,7 +3745,7 @@ async def get_withdrawal_process_text() -> str:
     return f"{val} {unit}"
 
 async def dashboard_card_text(user_id: int, first_name: str = "") -> str:
-    """The bot-chat home card: a 'coin jar' summary (owner redesign
+    """The bot-chat home card: a Birr summary card (owner redesign
     2026-11-27 — deliberately unlike the legacy dashboard: the card
     itself carries the user's numbers instead of a bare menu title)."""
     acc = await DataEngine.get_user(user_id)
@@ -3753,21 +3753,21 @@ async def dashboard_card_text(user_id: int, first_name: str = "") -> str:
     team, _ = await DataEngine.get_paid_referral_metrics(user_id)
     min_w = float(await DataEngine.get_setting("min_withdrawal", "50"))
     name = sanitize_html(first_name or (acc["full_name"] if acc else ""))
-    lines = ["🪙 <b>ANON EARN</b> — your coin jar", "━━━━━━━━━━━━━━"]
+    lines = ["🪙 <b>ANON EARN</b>", "━━━━━━━━━━━━━━"]
     if name:
         lines += [f"👋 Welcome back, <b>{name}</b>", ""]
-    lines.append(f"💰 In your jar: <b>{bal:,.2f} Birr</b>")
+    lines.append(f"💵 Your Birr: <b>{bal:,.2f} Birr</b>")
     lines.append(f"👥 Your team: <b>{team}</b> friends")
     if bal >= min_w:
-        lines.append("🎉 Your jar is full enough — you can cash out!")
+        lines.append("🎉 Your balance is ready — you can cash out!")
     else:
         lines.append(f"🎯 <b>{min_w - bal:,.2f} Birr</b> more and you can cash out")
-    lines += ["", "Coins drop in little by little — keep the streak alive 🔥"]
+    lines += ["", "Birr, little by little, every day — keep going 🔥"]
     return "\n".join(lines)
 
 
 def generate_dashboard_matrix(user_id: int) -> InlineKeyboardMarkup:
-    # Coin-jar dashboard buttons (owner redesign 2026-11-27): launch,
+    # Birr dashboard buttons (owner redesign 2026-11-27): launch,
     # money+team row, then a full-width Invite — the balance itself
     # lives on the card text now, so there is no Balance button.
     # Layout:  [        Launch Anon Earn       ]   <- full width
