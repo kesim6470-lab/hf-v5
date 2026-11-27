@@ -206,6 +206,17 @@ function AdminTasks() {
   const [link, setLink] = useState("");
   const [channel, setChannel] = useState("");
   const [type, setType] = useState("fake");
+  const [chanCheck, setChanCheck] = useState<any>(null);
+  const [checking, setChecking] = useState(false);
+
+  async function checkBotAdmin() {
+    const ref = channel.trim() || link.trim();
+    if (!ref) return toast("Enter the channel @username, ID or link first");
+    setChecking(true); setChanCheck(null);
+    try { setChanCheck(await api("/api/admin/channels/check_one", { ref })); }
+    catch (e: any) { toast(e?.message || "Check failed"); }
+    setChecking(false);
+  }
 
   const load = useCallback(async () => {
     const [p, m, a] = await Promise.all([
@@ -288,7 +299,17 @@ function AdminTasks() {
         {type === "force" && (
           <>
             <label className="f">Channel (@username or ID) — @AnonEarnAppBot must be an admin there</label>
-            <input value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="@YourChannel" />
+            <input value={channel} onChange={(e) => { setChannel(e.target.value); setChanCheck(null); }} placeholder="@YourChannel" />
+            <button className="btn ghost" onClick={checkBotAdmin} disabled={checking}>
+              {checking ? "🔍 Checking…" : "🔍 Check: is the bot an admin there?"}
+            </button>
+            {chanCheck && (
+              <div className="s" style={{ padding: "6px 0" }}>
+                {chanCheck.can_check
+                  ? <>✅ <b>{chanCheck.chat_title || chanCheck.ref}</b> — bot is <b>{chanCheck.bot_status}</b>, membership checks will work</>
+                  : <>❌ <b>{chanCheck.chat_title || chanCheck.ref}</b> — bot status: <b>{chanCheck.bot_status || "unknown"}</b>. Add @AnonEarnAppBot as an admin in that channel, otherwise the join check cannot verify anyone{chanCheck.error ? ` (${chanCheck.error})` : ""}</>}
+              </div>
+            )}
           </>
         )}
         <label className="f">Reward (Birr)</label>
@@ -391,7 +412,22 @@ function AdminChannels() {
   const [name, setName] = useState("");
   const [link, setLink] = useState("");
   const [cid, setCid] = useState("");
-  const [botAdded, setBotAdded] = useState(1);
+  const [botAdded, setBotAdded] = useState(0);
+  const [checkUid, setCheckUid] = useState("");
+  const [checkMap, setCheckMap] = useState<Record<string, any>>({});
+  const [checkingAll, setCheckingAll] = useState(false);
+
+  async function runChecker() {
+    setCheckingAll(true);
+    try {
+      const r = await api<{ results: any[] }>("/api/admin/channels/check", { user_id: Number(checkUid) || 0 });
+      const m: Record<string, any> = {};
+      (r.results || []).forEach((x) => { m[String(x.channel_id)] = x; });
+      setCheckMap(m);
+      toast("🩺 Checker done");
+    } catch (e: any) { toast(e?.message || "Checker failed"); }
+    setCheckingAll(false);
+  }
 
   const load = useCallback(async () => {
     try { const r = await api<{ channels: any[] }>("/api/admin/channels/list"); setChannels(r.channels || []); }
@@ -415,14 +451,31 @@ function AdminChannels() {
 
   return (
     <>
-      {channels.map((c) => (
+      <div className="card">
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>🩺 Force-join checker</div>
+        <div className="s" style={{ marginBottom: 8 }}>Verifies, per channel, whether @AnonEarnAppBot is an admin there — if it is not, the join check cannot verify anyone and silently passes. Optionally enter a user ID to also see that user's membership.</div>
+        <label className="f">Test user ID (optional)</label>
+        <input value={checkUid} onChange={(e) => setCheckUid(e.target.value)} placeholder="e.g. 6095314644" />
+        <button className="btn" onClick={runChecker} disabled={checkingAll}>{checkingAll ? "🔍 Checking…" : "🔍 Run checker"}</button>
+      </div>
+      {channels.map((c) => {
+        const chk = checkMap[String(c.channel_id)];
+        return (
         <div className="row" key={c.id}>
           <div className="tic">📣</div>
           <div className="grow"><div className="t">{c.channel_name}</div>
-            <div className="s">{c.bot_added ? "Real admin (membership checked)" : "No-admin (fake join)"} · {c.invite_link}</div></div>
+            <div className="s">{c.bot_added ? "No-admin (fake join)" : "Real admin (membership checked)"} · {c.invite_link}</div>
+            {chk && (
+              <div className="s">{chk.mode === "fake"
+                ? "🟡 Fake join — no check to run"
+                : chk.can_check
+                  ? <>✅ Bot is <b>{chk.bot_status}</b> — checks work{chk.user_status ? <> · test user: <b>{chk.user_status}</b></> : ""}</>
+                  : <>❌ Bot: <b>{chk.bot_status || "unknown"}</b> — checks CANNOT verify anyone{chk.error ? ` (${chk.error})` : ""}{chk.user_status ? <> · test user: <b>{chk.user_status}</b></> : ""}</>}</div>
+            )}</div>
           <button className="btn sm danger" onClick={() => del(c.id)}>🗑</button>
         </div>
-      ))}
+        );
+      })}
       <div className="card">
         <label className="f">Channel name</label>
         <input value={name} onChange={(e) => setName(e.target.value)} />
@@ -432,8 +485,8 @@ function AdminChannels() {
         <input value={cid} onChange={(e) => setCid(e.target.value)} placeholder="-100…" />
         <label className="f">Mode</label>
         <select value={botAdded} onChange={(e) => setBotAdded(Number(e.target.value))}>
-          <option value={1}>🔴 Real admin — bot is admin, membership verified</option>
-          <option value={0}>🟡 No admin — fake join</option>
+          <option value={0}>🔴 Real admin — bot is admin, membership verified</option>
+          <option value={1}>🟡 No admin — fake join</option>
         </select>
         <button className="btn" onClick={add}>➕ Add channel</button>
       </div>
@@ -537,6 +590,7 @@ function AdminSettings() {
       {num("min_withdrawal", "Minimum withdrawal (Birr)")}
       {bool("withdraw_telebirr_enabled", "Telebirr withdrawals")}
       {bool("withdraw_binance_enabled", "Binance Pay withdrawals")}
+      {bool("invite_show_binance", "Binance Pay in invite/share text")}
       {num("min_ads_for_withdrawal", "Min ads before withdrawal", "1")}
       {num("usdt_rate", "USDT rate (Birr)")}
       {txt("support_username", "Support username")}
