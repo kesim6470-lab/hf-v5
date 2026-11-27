@@ -219,7 +219,7 @@ export default function App() {
               <div className="gate-list">
                 {forceUnjoined.map((c: any) => (
                   <div className="gate-row" key={c.id}>
-                    <div className="gate-ava">{(c.channel_name || "C").trim().charAt(0).toUpperCase()}</div>
+                    <div className="gate-ava"><img src="/task-icon.png" alt="" /></div>
                     <div className="gate-meta">
                       <div className="gate-name">{c.channel_name}</div>
                       <div className="gate-hint">Membership required</div>
