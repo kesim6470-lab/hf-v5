@@ -232,49 +232,49 @@ export default function Home() {
       {ticker.length > 0 && (
         <div className="ticker">
           {ticker.slice(0, 10).map((w, i) => (
-            <span className="tk" key={i}>✅ {w.full_name} withdrew {fmt(w.amount)} Birr</span>
+            <span className="tk" key={i}>✅ {w.full_name} cashed out {fmt(w.amount)} Birr</span>
           ))}
         </div>
       )}
 
+      {(daily?.enabled || dl?.enabled) && <h3 className="sect">Earn Today</h3>}
+
       {daily?.enabled && (
         <>
-          <h3 className="sect">⚡ Daily</h3>
-          <div className="grid2">
-            <div className="tile c1">
-              <div className="icon">🔥</div><div className="amt">+{fmt(daily.reward)} Birr</div>
-              <div className="name">Daily Check In</div>
-              <div className="sub">Streak: {daily.streak} days 🔥</div>
-              <button className="btn pulse" disabled={daily.claimed_today || busyCheckin} onClick={checkIn}>
-                {busyCheckin ? <><Spinner />Checking…</> : daily.claimed_today ? "✔ Done today" : "Check In"}
-              </button>
+          <div className="row">
+            <div className="tic">🔥</div>
+            <div className="grow">
+              <div className="t">Daily Check In · +{fmt(daily.reward)} Birr</div>
+              <div className="s">Streak: {daily.streak} days 🔥 — come back every day</div>
             </div>
-            <div className="tile c2">
-              <div className="icon">🎬</div><div className="amt">+{fmt(ads?.reward_amount ?? 0.5)} Birr</div>
-              <div className="name">Watch Ad</div>
-              <div className="sub">{ads?.maintenance ? "Under maintenance 🔧" : ads ? `${ads.watched_today}/${ads.daily_limit} today${ads.seconds_left > 0 ? ` · wait ${ads.seconds_left}s` : ""}` : "…"}</div>
-              <button className="btn" disabled={!!ads?.maintenance || !ads?.enabled || videoCapped || busyAd} onClick={watchAd}>
-                {busyAd ? <><Spinner />Loading ad…</> : ads?.maintenance ? "🚧 Under Maintenance" : videoCapped ? "Limit reached" : "Watch Ad"}
-              </button>
+            <button className="btn sm" disabled={daily.claimed_today || busyCheckin} onClick={checkIn}>
+              {busyCheckin ? <><Spinner />Checking…</> : daily.claimed_today ? "✔ Done" : "Check In"}
+            </button>
+          </div>
+          <div className="row">
+            <div className="tic">🎬</div>
+            <div className="grow">
+              <div className="t">Watch Ad · +{fmt(ads?.reward_amount ?? 0.5)} Birr</div>
+              <div className="s">{ads?.maintenance ? "Under maintenance 🔧" : ads ? `${ads.watched_today}/${ads.daily_limit} watched today${ads.seconds_left > 0 ? ` · wait ${ads.seconds_left}s` : ""}` : "…"}</div>
             </div>
+            <button className="btn sm" disabled={!!ads?.maintenance || !ads?.enabled || videoCapped || busyAd} onClick={watchAd}>
+              {busyAd ? <><Spinner />Loading…</> : ads?.maintenance ? "🚧 Soon" : videoCapped ? "Limit reached" : "Watch"}
+            </button>
           </div>
         </>
       )}
 
       {dl?.enabled && (
-        <>
-          <h3 className="sect">🔗 Direct Link</h3>
-          <div className="row">
-            <div className="tic">🔗</div>
-            <div className="grow">
-              <div className="t">Direct Link Ad</div>
-              <div className="s">Earn {fmt(dl.reward_amount)} Birr per visit · {dl.watched_today}/{dl.daily_limit} today{dl.seconds_left > 0 ? ` · wait ${dl.seconds_left}s` : ""}</div>
-            </div>
-            <button className="btn sm" disabled={dlCapped || busyDl || dl.seconds_left > 0} onClick={directLink}>
-              {busyDl ? <Spinner /> : dlCapped ? "Done" : "Open"}
-            </button>
+        <div className="row">
+          <div className="tic">🔗</div>
+          <div className="grow">
+            <div className="t">Visit & Earn · +{fmt(dl.reward_amount)} Birr</div>
+            <div className="s">Open the link, stay a few seconds · {dl.watched_today}/{dl.daily_limit} today{dl.seconds_left > 0 ? ` · wait ${dl.seconds_left}s` : ""}</div>
           </div>
-        </>
+          <button className="btn sm" disabled={dlCapped || busyDl || dl.seconds_left > 0} onClick={directLink}>
+            {busyDl ? <Spinner /> : dlCapped ? "Done" : "Open"}
+          </button>
+        </div>
       )}
 
       <div className="row team-strip" onClick={() => go("invite")}>
@@ -285,13 +285,6 @@ export default function Home() {
         </div>
         <button className="btn sm" onClick={() => go("invite")}>Invite</button>
       </div>
-
-      <h3 className="sect">Quick Actions</h3>
-      <div className="grid2">
-        <button className="btn gold" style={{ marginTop: 0 }} onClick={() => go("tasks")}>🎯 Do Tasks</button>
-        <button className="btn ghost" style={{ marginTop: 0 }} onClick={() => go("invite")}>🔗 Invite Friends</button>
-      </div>
-      <button className="btn ghost" onClick={() => go("withdraw")}>💸 Request Withdrawal</button>
     </section>
   );
 }
