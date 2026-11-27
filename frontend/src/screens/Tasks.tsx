@@ -52,23 +52,42 @@ export default function Tasks() {
 
   useEffect(() => { load(); loadMine(); }, [load, loadMine]);
 
+  // t.me links MUST go through openTelegramLink — openLink hands them
+  // to an external browser and the button looks dead inside Telegram
+  // (owner report 2026-11-26). Same rule as the App gate.
+  function openTaskLink(t: Task) {
+    if (!t.invite_link) return;
+    let link = t.invite_link.trim();
+    if (link.startsWith("@")) link = "https://t.me/" + link.slice(1);
+    else if (link.startsWith("t.me/")) link = "https://" + link;
+    if (link.startsWith("https://t.me/") && tg?.openTelegramLink) tg.openTelegramLink(link);
+    else if (tg?.openLink) tg.openLink(link);
+    else window.open(link, "_blank");
+  }
+
   async function join(t: Task) {
     setBusy(t.id);
     try {
       await api("/api/tasks/join", { task_id: t.id });
-      if (t.invite_link) {
-        // t.me links MUST go through openTelegramLink — openLink hands
-        // them to an external browser and the button looks dead inside
-        // Telegram (owner report 2026-11-26). Same rule as the App gate.
-        let link = t.invite_link.trim();
-        if (link.startsWith("@")) link = "https://t.me/" + link.slice(1);
-        else if (link.startsWith("t.me/")) link = "https://" + link;
-        if (link.startsWith("https://t.me/") && tg?.openTelegramLink) tg.openTelegramLink(link);
-        else if (tg?.openLink) tg.openLink(link);
-        else window.open(link, "_blank");
-      }
+      openTaskLink(t);
       toast("⏳ Joined — come back here, we verify automatically");
     } catch (e: any) { toast(e?.message || "Join failed"); }
+    setBusy(null);
+  }
+
+  // Owner's button flow (2026-11-27): after joining, the button still
+  // says "Join". Tapping it checks membership — if the user is NOT in
+  // the channel it sends them back to join (re-opens the channel); if
+  // they ARE in, the button flips to "Claim".
+  async function joinOrVerify(t: Task) {
+    setBusy(t.id);
+    const ok = await checkSilent(t);
+    if (ok) {
+      toast("✅ Verified — tap Claim");
+    } else {
+      toast("❌ You haven't joined yet — opening the channel");
+      openTaskLink(t);
+    }
     setBusy(null);
   }
 
@@ -202,7 +221,7 @@ export default function Tasks() {
                   : t.status === "review" ? "📸 Under review"
                   : t.status === "rejected" ? "❌ Submission rejected"
                   : t.status === "completed" ? "✔ Completed"
-                  : t.status === "claimable" ? (verified.has(t.id) ? "✔ Verified — claim your reward" : "Joined — one tap to claim")
+                  : t.status === "claimable" ? (verified.has(t.id) ? "✔ Verified — claim your reward" : "Tap Join — if you're in, it becomes Claim")
                   : "Join, then claim"}
               </div>
             </div>
@@ -217,7 +236,11 @@ export default function Tasks() {
             ) : t.status === "completed" ? (
               <button className="btn sm" disabled>✔ Done</button>
             ) : t.status === "claimable" ? (
-              <button className="btn sm" disabled={busy === t.id} onClick={() => claim(t)}>{busy === t.id ? <Spinner /> : null}{verified.has(t.id) ? "Claim" : "Verify & Claim"}</button>
+              verified.has(t.id) ? (
+                <button className="btn sm" disabled={busy === t.id} onClick={() => claim(t)}>{busy === t.id ? <Spinner /> : null}Claim</button>
+              ) : (
+                <button className="btn sm" disabled={busy === t.id} onClick={() => joinOrVerify(t)}>{busy === t.id ? <Spinner /> : null}Join</button>
+              )
             ) : (
               <button className="btn sm" disabled={busy === t.id} onClick={() => join(t)}>
                 {t.status === "waiting" ? `⏳ ${Math.max(0, (t.wait_left ?? 0) - Math.floor((Date.now() - loadedAtRef.current) / 1000))}s` : "Join"}
