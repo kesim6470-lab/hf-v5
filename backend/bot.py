@@ -3767,22 +3767,13 @@ async def dashboard_card_text(user_id: int, first_name: str = "") -> str:
 
 
 def generate_dashboard_matrix(user_id: int) -> InlineKeyboardMarkup:
-    # Birr dashboard buttons (owner redesign 2026-11-27): launch,
-    # money+team row, then a full-width Invite — the balance itself
-    # lives on the card text now, so there is no Balance button.
-    # Layout:  [        Launch Anon Earn       ]   <- full width
-    #          [ Cash Out ]  [   My Team   ]         <- money row
-    #          [        Invite Friends        ]   <- full width
+    # Owner order 2026-11-27: the chat dashboard shows ONLY Balance and
+    # Invite — everything else lives in the Mini App (opened from the
+    # bot's menu button). Admins keep their panel entry.
+    # Layout:  [  Balance  ]  [  Invite Friends  ]
     rows = [
-        [InlineKeyboardButton(
-            text="🚀 Launch Anon Earn",
-            web_app=WebAppInfo(url=f"{FRONTEND_URL}/app.html?uid={user_id}")
-        )],
         [
-            InlineKeyboardButton(text="💸 Cash Out", callback_data="ui_initiate_withdrawal"),
-            InlineKeyboardButton(text="👥 My Team",  callback_data="ui_fetch_referrals"),
-        ],
-        [
+            InlineKeyboardButton(text="💰 Balance",        callback_data="ui_fetch_balance"),
             InlineKeyboardButton(text="📤 Invite Friends", callback_data="ui_fetch_link"),
         ],
     ]
