@@ -4414,7 +4414,6 @@ async def approve_withdrawal_core(tid: int, notify_mode: str = "both") -> dict:
             f"✅ <b>WITHDRAWAL COMPLETED</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
             f"👤 <b>{recipient_label}:</b> {sanitize_html(recipient_value)}\n\n"
-            f"🆔 <b>User ID:</b> <code>{ticket['user_id']}</code>\n\n"
             f"💰 <b>Amount:</b> ETB {ticket['amount']:.2f}\n\n"
             f"📱 <b>Method:</b> {'Binance Pay' if is_binance else 'Telebirr'}\n\n"
             f"📊 <b>Status:</b> Paid ✅\n\n"
@@ -7696,13 +7695,11 @@ async def api_admin_proofs_manual(body: AdminManualProofRequest):
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🚀 Start Earn", url=f"https://t.me/{me.username}")
     ]])
-    uid_line = f"🆔 <b>User ID:</b> <code>{body.user_id}</code>\n\n" if body.user_id else ""
     txt = (
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"✅ <b>WITHDRAWAL COMPLETED</b>\n\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"👤 <b>{'Binance UID' if is_binance else 'Recipient'}:</b> {sanitize_html(body.name.strip())}\n\n"
-        f"{uid_line}"
         f"💰 <b>Amount:</b> ETB {body.amount:.2f}\n\n"
         f"📱 <b>Method:</b> {'Binance Pay' if is_binance else 'Telebirr'}\n\n"
         f"📊 <b>Status:</b> Paid ✅\n\n"
