@@ -22,15 +22,16 @@ export default function Invite() {
   const referralLink = me.referral_link;
 
   const inviteText =
-    "🪙 ANON EARN — Birr, little by little, every day.\n\n" +
-    "🎬 clips I watch turn into Birr\n" +
-    "🎯 small missions, quick rewards\n" +
-    "🔥 a daily streak that keeps paying\n" +
-    "👥 friends I bring in earn me more\n\n" +
+    "🪙 ANON EARN — Earn Birr, one step at a time.\n\n" +
+    "🎬 Watch videos and earn rewards.\n" +
+    "🎯 Complete simple tasks for extra Birr.\n" +
+    "🔥 Keep your daily streak going.\n" +
+    "👥 Invite friends and earn referral rewards.\n" +
+    "🏆 Climb the Weekly Top 20 and win bonuses.\n\n" +
     (me.invite_show_binance === false
-      ? "Payouts go to Telebirr.\n\n"
-      : "Payouts go to Telebirr or Binance Pay.\n\n") +
-    "Your turn — start free 👇\n" +
+      ? "💸 Withdraw your earnings straight to Telebirr.\n\n"
+      : "💸 Withdraw your earnings straight to Telebirr or Binance Pay.\n\n") +
+    "Ready to get started? Join now 👇\n" +
     referralLink;
 
   function inviteFriends() {
