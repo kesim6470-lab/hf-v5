@@ -326,6 +326,13 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
     }
     const r = channelRef(link);
     if (!r) { toast("Paste your channel link"); return; }
+    // A bare numeric channel ID passes the admin check but can never
+    // become a t.me invite link at Step 2 (backend rejects it) — stop
+    // here with the fix instead of failing at the end (audit 2026-11-28).
+    if (/^-?\d+$/.test(r)) {
+      toast("Use your channel's public link or @username — not the numeric ID");
+      return;
+    }
     setBusy(true);
     try {
       const v = await api<{ is_admin: boolean; title: string | null }>("/api/tasks/verify_admin", { channel_id: r });
