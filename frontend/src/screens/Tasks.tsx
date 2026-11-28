@@ -11,9 +11,9 @@ const TASK_ICON = "/task-icon.png";
 
 /** Tasks: join → wait → check → claim for auto tasks; screenshot upload
  *  for manual tasks; My Tasks (escrow status + cancel/refund); and the
- *  Create-Task form (owner-simplified 2026-11-28: ONE link field —
- *  bot-admin verify, then create with default reward/slots), gated by
- *  the backend's user_task_config. */
+ *  Create-Task form (owner-simplified 2026-11-28: link field +
+ *  bot-admin verify, user-chosen reward/people, total shown up
+ *  front), gated by the backend's user_task_config. */
 export default function Tasks() {
   const { toast, refreshMe } = useApp();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -299,14 +299,15 @@ export default function Tasks() {
 function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
   const { toast, refreshMe } = useApp();
   const [link, setLink] = useState("");
+  const [reward, setReward] = useState(String(cfg.min_reward ?? 1));
+  const [slots, setSlots] = useState(String(cfg.min_slots ?? 5));
   const [busy, setBusy] = useState(false);
 
-  // Owner order 2026-11-28: the form takes ONE thing — the channel
-  // link. Reward/slots are fixed at the configured minimums; the task
-  // title comes back from the bot-admin check itself.
-  const reward = Number(cfg.min_reward ?? 1);
-  const slots = Number(cfg.min_slots ?? 5);
-  const total = reward * slots;
+  // Owner order 2026-11-28: link + verify is the core of the form;
+  // the user still chooses reward per person and how many people,
+  // sees the total needed up front, and the task title comes back
+  // from the bot-admin check itself.
+  const total = (Number(reward) || 0) * (Number(slots) || 0);
 
   function channelRef(raw: string): string {
     const s = raw.trim();
@@ -332,14 +333,16 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
       }
       const invite = ref.startsWith("@") ? `https://t.me/${ref.slice(1)}` : link.trim();
       const r = await api<{ total_cost: number }>("/api/tasks/create", {
-        title: v.title || ref, invite_link: invite, reward, budget_slots: slots,
+        title: v.title || ref, invite_link: invite, reward: Number(reward), budget_slots: Number(slots),
         channel_id: ref,
       });
       toast(`✅ Task submitted for review — ${fmt(r.total_cost)} Birr escrowed`);
       refreshMe(); onDone();
     } catch (e: any) {
       const msgs: Record<string, string> = {
-        insufficient_balance: "❌ Insufficient balance for that budget",
+        insufficient_balance: "❌ Not enough balance — contact admin to top up",
+        reward_out_of_range: `Reward must be ${cfg.min_reward}–${cfg.max_reward} Birr`,
+        slots_out_of_range: `People must be ${cfg.min_slots}–${cfg.max_slots}`,
         invalid_link: "Link must be a t.me link", missing_fields: "Paste your channel link",
       };
       toast(msgs[e?.message] || e?.message || "Create failed");
@@ -355,8 +358,12 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
       </div>
       <div style={{ height: 10 }} />
       <input placeholder="https://t.me/yourchannel" value={link} onChange={(e) => setLink(e.target.value)} />
+      <label className="f">Reward per person (Birr) — {cfg.min_reward}…{cfg.max_reward}</label>
+      <input type="number" value={reward} onChange={(e) => setReward(e.target.value)} />
+      <label className="f">How many people — {cfg.min_slots}…{cfg.max_slots}</label>
+      <input type="number" value={slots} onChange={(e) => setSlots(e.target.value)} />
       <div className="s" style={{ color: "var(--muted)", fontSize: 13 }}>
-        Total from your balance: <b>{fmt(total)} Birr</b> ({fmt(reward)} Birr × {slots} people)
+        Total needed: <b>{fmt(total)} Birr</b> from your balance
       </div>
       <button className="btn" disabled={busy} onClick={create}>{busy ? <><Spinner />Checking…</> : "Verify & Create"}</button>
     </div>
