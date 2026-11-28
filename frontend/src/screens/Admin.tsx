@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, fmt, type Task, type Withdrawal } from "../api";
+import { api, fmt, tg, type Task, type Withdrawal } from "../api";
 import { useApp } from "../App";
 import { Btn, Shimmer } from "../components/ui";
 
@@ -16,7 +16,7 @@ function tapConfirm(key: string): boolean {
   return false;
 }
 
-type Sub = "overview" | "withdrawals" | "tasks" | "users" | "channels" | "ads" | "settings" | "broadcast";
+type Sub = "overview" | "withdrawals" | "tasks" | "users" | "channels" | "ads" | "settings" | "broadcast" | "proof";
 
 const SUBS: { id: Sub; label: string }[] = [
   { id: "overview", label: "📊 Overview" },
@@ -27,6 +27,7 @@ const SUBS: { id: Sub; label: string }[] = [
   { id: "ads", label: "🎬 Ads" },
   { id: "settings", label: "⚙️ Settings" },
   { id: "broadcast", label: "📢 Broadcast" },
+  { id: "proof", label: "🧾 Proof" },
 ];
 
 /** Admin Control Center — same backend endpoints as the legacy admin
@@ -53,6 +54,7 @@ export default function Admin() {
       {sub === "ads" && <AdminAds />}
       {sub === "settings" && <AdminSettings />}
       {sub === "broadcast" && <AdminBroadcast />}
+      {sub === "proof" && <AdminProof />}
     </section>
   );
 }
@@ -233,6 +235,23 @@ function AdminTasks() {
     catch (e: any) { toast(e?.message || "Review failed"); }
     load();
   }
+  // Owner order 2026-11-28: from a pending user task, open the
+  // submitter's channel to inspect it before approving/rejecting.
+  function viewChannel(t: Task) {
+    let link = (t.invite_link || "").trim();
+    if (!link && t.channel_id) {
+      const c = String(t.channel_id).trim();
+      if (c.startsWith("@")) link = "https://t.me/" + c.slice(1);
+      else if (/^-100\d+$/.test(c)) link = "https://t.me/c/" + c.slice(4);
+      else if (/^\d+$/.test(c)) link = "https://t.me/c/" + c;
+    }
+    if (link.startsWith("@")) link = "https://t.me/" + link.slice(1);
+    else if (link.startsWith("t.me/")) link = "https://" + link;
+    if (!link) { toast("No channel link on this task"); return; }
+    if (link.startsWith("https://t.me/") && tg?.openTelegramLink) tg.openTelegramLink(link);
+    else if (tg?.openLink) tg.openLink(link);
+    else window.open(link, "_blank");
+  }
   async function reviewManual(id: number, approve: boolean) {
     try { await api("/api/admin/tasks/manual_submissions/review", { id, approve }); toast(approve ? "✅ Approved & paid" : "❌ Rejected"); }
     catch (e: any) { toast(e?.message || "Review failed"); }
@@ -268,7 +287,8 @@ function AdminTasks() {
       {pending.map((t) => (
         <div className="row" key={`p${t.id}`}>
           <div className="grow"><div className="t">{t.title}</div>
-            <div className="s">{fmt(t.reward)} Birr × {t.budget_slots} slots · by user {t.created_by}</div></div>
+            <div className="s">{fmt(t.reward)} Birr × {t.budget_slots} slots · by user {t.created_by}{t.channel_id ? ` · ${t.channel_id}` : ""}</div></div>
+          <button className="btn sm ghost" onClick={() => viewChannel(t)}>📣 View channel</button>
           <button className="btn sm" onClick={() => reviewTask(t.id, true)}>✅ Approve</button>
           <button className="btn sm danger" onClick={() => reviewTask(t.id, false)}>❌ Reject</button>
         </div>
@@ -624,6 +644,73 @@ function AdminSettings() {
         Advanced fields not shown here (click-reminder texts, referral-skip tuning, batch
         cooldowns, ticker) keep their current values — saving never resets them.
       </div>
+    </div>
+  );
+}
+
+function AdminProof() {
+  const { toast } = useApp();
+  const [postId, setPostId] = useState("");
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [uid, setUid] = useState("");
+  const [method, setMethod] = useState<"telebirr" | "binance">("telebirr");
+  const [busy, setBusy] = useState(false);
+  async function postRequest() {
+    const amt = Number(amount);
+    if (!name.trim()) return toast("Enter the recipient name");
+    if (!amt || amt <= 0) return toast("Enter the amount");
+    if (!tapConfirm("manual-request")) return toast("⚠️ Tap again to confirm — the bot posts the request to the proof channel");
+    setBusy(true);
+    try {
+      const r = await api<{ ok: boolean; message_id: number }>("/api/admin/proofs/manual-request", {
+        name: name.trim(), amount: amt, user_id: Number(uid) || 0, method,
+      });
+      setPostId(String(r.message_id));
+      toast(`📥 Request posted — Post ID ${r.message_id} filled in below`);
+    } catch (e: any) { toast(e?.message || "Post failed"); }
+    setBusy(false);
+  }
+  async function post() {
+    const pid = Number(postId);
+    const amt = Number(amount);
+    if (!pid || pid <= 0) return toast("Enter the request Post ID");
+    if (!name.trim()) return toast("Enter the recipient name");
+    if (!amt || amt <= 0) return toast("Enter the amount");
+    if (!tapConfirm("manual-proof")) return toast("⚠️ Tap Post again to confirm — this goes to the public proof channel");
+    setBusy(true);
+    try {
+      const r = await api<{ ok: boolean; message_id: number }>("/api/admin/proofs/manual", {
+        post_id: pid, name: name.trim(), amount: amt,
+        user_id: Number(uid) || 0, method,
+      });
+      toast(`✅ Proof posted (message ${r.message_id})`);
+      setPostId(""); setName(""); setAmount(""); setUid("");
+    } catch (e: any) { toast(e?.message || "Post failed"); }
+    setBusy(false);
+  }
+  return (
+    <div className="card">
+      <div style={{ fontWeight: 800, marginBottom: 6 }}>🧾 Manual proof post</div>
+      <div className="s" style={{ marginBottom: 8 }}>
+        Step 1: the bot posts a NEW WITHDRAWAL REQUEST to @Anon_earnp, exactly like an
+        automatic one. Step 2: post the WITHDRAWAL COMPLETED proof as its reply.
+      </div>
+      <label className="f">{method === "binance" ? "Binance UID" : "Recipient name"}</label>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={method === "binance" ? "e.g. 123456789" : "e.g. Abebe Kebede"} />
+      <label className="f">Amount (Birr)</label>
+      <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50" />
+      <label className="f">User ID (optional)</label>
+      <input inputMode="numeric" value={uid} onChange={(e) => setUid(e.target.value)} placeholder="Telegram user ID — shown on the posts" />
+      <label className="f">Method</label>
+      <div className="seg">
+        <button className={method === "telebirr" ? "active" : ""} onClick={() => setMethod("telebirr")}>Telebirr</button>
+        <button className={method === "binance" ? "active" : ""} onClick={() => setMethod("binance")}>Binance Pay</button>
+      </div>
+      <button className="btn" disabled={busy} onClick={postRequest}>{busy ? "Posting…" : "📥 Step 1 — Post request"}</button>
+      <label className="f">Post ID (request post — auto-filled by Step 1)</label>
+      <input inputMode="numeric" value={postId} onChange={(e) => setPostId(e.target.value)} placeholder="e.g. 12" />
+      <button className="btn gold" disabled={busy} onClick={post}>{busy ? "Posting…" : "🧾 Step 2 — Post completed proof"}</button>
     </div>
   );
 }
