@@ -7234,6 +7234,26 @@ async def api_admin_tasks_review(body: AdminTaskReviewRequest):
             await bot.send_message(info["created_by"], note)
         except Exception:
             pass
+    if body.approve and info["created_by"]:
+        # Owner order 2026-11-28: when a user's task goes live, the bot
+        # auto-posts the creator's own Anon Earn invite link in their
+        # channel (the bot is admin there — verified before the task
+        # could be created). Best-effort: a failed post never affects
+        # the approval itself.
+        try:
+            task = await DataEngine.get_task(body.id)
+            channel_id = (task["channel_id"] if task else "") or ""
+            if channel_id:
+                uname = BOT_USERNAME or (await bot.get_me()).username
+                link = f"https://t.me/{uname}?start={info['created_by']}"
+                show_binance = (await DataEngine.get_setting("invite_show_binance", "0")) == "1"
+                kb = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🪙 Start on Anon Earn", url=link)],
+                ])
+                await bot.send_message(channel_id, invite_share_text(link, show_binance),
+                                       reply_markup=kb)
+        except Exception:
+            pass
     return {"ok": True}
 
 
