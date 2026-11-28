@@ -3248,10 +3248,21 @@ async def process_channel_revalidation(callback: CallbackQuery, state: FSMContex
             except Exception:
                 pass
 
-        sent = await callback.message.answer(
-            f"{BOT_RULES_CAPTION}\n\n🛡️ <b>Almost there:</b> complete the quick security check:",
-            reply_markup=generate_verification_widget(uid, ref, 0)
-        )
+        # The verification message arrives WITH the bot's logo image
+        # (owner order 2026-11-28) — photo + caption + the inline
+        # Start Verification button, never bare text.
+        _verify_caption = f"{BOT_RULES_CAPTION}\n\n🛡️ <b>Almost there:</b> complete the quick security check:"
+        try:
+            sent = await callback.message.answer_photo(
+                FSInputFile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo.png")),
+                caption=_verify_caption,
+                reply_markup=generate_verification_widget(uid, ref, 0)
+            )
+        except Exception:
+            sent = await callback.message.answer(
+                _verify_caption,
+                reply_markup=generate_verification_widget(uid, ref, 0)
+            )
         await sent.edit_reply_markup(reply_markup=generate_verification_widget(uid, ref, sent.message_id))
         await DataEngine.set_last_verify_msg(uid, sent.message_id)
 
