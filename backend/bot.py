@@ -438,6 +438,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_enabled', '1');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_pool', '500');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_percents', '[22,15,11,8,6,5,4.5,4,3.5,3,2.8,2.5,2.3,2,1.9,1.7,1.5,1.3,1.1,0.9]');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_last_paid', '');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('weekly_top_anchor_ts', '');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('monetag_zone_id', '');
 INSERT OR IGNORE INTO settings (key, value) VALUES ('monetag_sdk_url', '');
 -- Tads — second/gating rewarded ad shown right after AdsGram's video ad
@@ -907,19 +908,54 @@ class DataEngine:
                     for r in rows]
 
     # ── Weekly Top 20 rewards ─────────────────────────────────────────
-    # A "week" runs Monday 00:00 UTC → next Monday 00:00 UTC. Ranking
-    # counts invitees with referral_paid = 1 whose joined_at (their
-    # verification moment) falls inside the week.
+    # A "week" is a rolling 7-day cycle anchored at
+    # weekly_top_anchor_ts (owner order 2026-11-28: a fresh full 7-day
+    # week instead of the Monday-UTC calendar week, which showed only
+    # "2 days left" mid-cycle). Ranking counts invitees with
+    # referral_paid = 1 whose joined_at (their verification moment)
+    # falls inside the cycle.
 
     @staticmethod
-    def week_bounds(when: datetime | None = None):
-        """(start, end, week_id) for the week containing `when` (UTC)."""
+    def week_bounds(when: datetime | None = None, anchor_ts: int = 0):
+        """(start, end, week_id) for the cycle containing `when` (UTC).
+
+        With an anchor, cycles are [anchor + k·7d, anchor + (k+1)·7d)
+        and week_id is the cycle start date; without one, the legacy
+        Monday 00:00 UTC calendar week is used."""
         now = when or datetime.utcnow()
+        if anchor_ts:
+            anchor = datetime.utcfromtimestamp(anchor_ts)
+            k = (now - anchor).days // 7
+            start = anchor + timedelta(days=7 * k)
+            end = start + timedelta(days=7)
+            return start, end, start.strftime("%Y-%m-%d")
         monday = (now - timedelta(days=now.weekday())).replace(
             hour=0, minute=0, second=0, microsecond=0)
         end = monday + timedelta(days=7)
         iso = monday.isocalendar()
         return monday, end, f"{iso[0]}-W{iso[1]:02d}"
+
+    @staticmethod
+    async def weekly_anchor_ts() -> int:
+        """The rolling-week anchor (unix ts, UTC). Initialized ONCE to
+        'now' on first use; the partial cycle before the anchor is
+        marked as paid at init so the payout loop never back-pays the
+        days that ran under the old calendar week."""
+        raw = await DataEngine.get_setting("weekly_top_anchor_ts", "")
+        try:
+            ts = int(raw)
+        except (TypeError, ValueError):
+            ts = 0
+        if ts > 0:
+            return ts
+        ts = int(datetime.utcnow().timestamp())
+        await DataEngine.set_setting("weekly_top_anchor_ts", str(ts))
+        _s, _e, pre_id = DataEngine.week_bounds(
+            datetime.utcnow() - timedelta(days=7), ts)
+        await DataEngine.set_setting("weekly_top_last_paid", pre_id)
+        logger.info(f"Weekly Top rolling anchor set to {ts} "
+                    f"(pre-anchor cycle {pre_id} marked settled)")
+        return ts
 
     @staticmethod
     async def weekly_top_config():
@@ -1029,8 +1065,9 @@ class DataEngine:
         Test/demo referrers (user_id <= 0) never receive real money,
         but they keep their rank slot (their prize is simply not paid)."""
         cfg = await DataEngine.weekly_top_config()
+        anchor = await DataEngine.weekly_anchor_ts()
         _start, _end, prev_id = DataEngine.week_bounds(
-            datetime.utcnow() - timedelta(days=7))
+            datetime.utcnow() - timedelta(days=7), anchor)
         last = await DataEngine.get_setting("weekly_top_last_paid", "")
         if last == prev_id:
             return "already_paid"
@@ -1038,7 +1075,7 @@ class DataEngine:
             await DataEngine.set_setting("weekly_top_last_paid", prev_id)
             return "skipped_disabled"
         prev_start, prev_end, _ = DataEngine.week_bounds(
-            datetime.utcnow() - timedelta(days=7))
+            datetime.utcnow() - timedelta(days=7), anchor)
         rows = await DataEngine.get_weekly_top(prev_start, prev_end, 20)
         paid = 0
         for i, r in enumerate(rows):
@@ -5874,7 +5911,8 @@ async def api_leaderboard(body: ApiBase):
     user = await _authenticate(body)
     uid = user["user_id"]
     cfg = await DataEngine.weekly_top_config()
-    start, end, week_id = DataEngine.week_bounds()
+    anchor = await DataEngine.weekly_anchor_ts()
+    start, end, week_id = DataEngine.week_bounds(anchor_ts=anchor)
     rows = await DataEngine.get_weekly_top(start, end, 20)
 
     def pub(i, r):
