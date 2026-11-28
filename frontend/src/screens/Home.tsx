@@ -289,8 +289,7 @@ export default function Home() {
       <div className="row" onClick={() => tg?.openTelegramLink?.("https://t.me/Anon_earnp")}>
         <div className="tic">🧾</div>
         <div className="grow">
-          <div className="t">Payment Channel</div>
-          <div className="s">See real payouts — every withdrawal is posted publicly</div>
+          <div className="t">Payout Channel</div>
         </div>
         <button className="btn sm">View</button>
       </div>
