@@ -11,7 +11,8 @@ const TASK_ICON = "/task-icon.png";
 
 /** Tasks: join → wait → check → claim for auto tasks; screenshot upload
  *  for manual tasks; My Tasks (escrow status + cancel/refund); and the
- *  Create-Task wizard (verify bot-admin → details → escrow), gated by
+ *  Create-Task form (owner-simplified 2026-11-28: ONE link field —
+ *  bot-admin verify, then create with default reward/slots), gated by
  *  the backend's user_task_config. */
 export default function Tasks() {
   const { toast, refreshMe } = useApp();
@@ -297,80 +298,67 @@ export default function Tasks() {
 
 function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
   const { toast, refreshMe } = useApp();
-  const [step, setStep] = useState(1);
-  const [channelId, setChannelId] = useState("");
-  const [verified, setVerified] = useState<boolean | null>(null);
-  const [title, setTitle] = useState("");
   const [link, setLink] = useState("");
-  const [reward, setReward] = useState(String(cfg.min_reward ?? 1));
-  const [slots, setSlots] = useState(String(cfg.min_slots ?? 5));
   const [busy, setBusy] = useState(false);
 
-  async function verify() {
-    setBusy(true);
-    try {
-      const r = await api<{ is_admin: boolean; title: string | null }>("/api/tasks/verify_admin", { channel_id: channelId });
-      setVerified(r.is_admin);
-      if (r.title && !title) setTitle(r.title);
-      if (!channelId) setVerified(null);
-      setStep(2);
-    } catch (e: any) { toast(e?.message || "Verify failed"); }
-    setBusy(false);
+  // Owner order 2026-11-28: the form takes ONE thing — the channel
+  // link. Reward/slots are fixed at the configured minimums; the task
+  // title comes back from the bot-admin check itself.
+  const reward = Number(cfg.min_reward ?? 1);
+  const slots = Number(cfg.min_slots ?? 5);
+  const total = reward * slots;
+
+  function channelRef(raw: string): string {
+    const s = raw.trim();
+    const m = s.match(/(?:t\.me\/|@)([A-Za-z0-9_]+)/);
+    if (m) return "@" + m[1];
+    return s; // numeric -100… id pasted directly
   }
 
   async function create() {
+    if (link.includes("t.me/+") || link.includes("joinchat")) {
+      toast("Use your channel's public link or @username");
+      return;
+    }
+    const ref = channelRef(link);
+    if (!ref) { toast("Paste your channel link"); return; }
     setBusy(true);
     try {
+      const v = await api<{ is_admin: boolean; title: string | null }>("/api/tasks/verify_admin", { channel_id: ref });
+      if (!v.is_admin) {
+        toast(`❌ Add @${cfg.bot_username} as an admin in your channel first`);
+        setBusy(false);
+        return;
+      }
+      const invite = ref.startsWith("@") ? `https://t.me/${ref.slice(1)}` : link.trim();
       const r = await api<{ total_cost: number }>("/api/tasks/create", {
-        title, invite_link: link, reward: Number(reward), budget_slots: Number(slots),
-        channel_id: verified ? channelId : "",
+        title: v.title || ref, invite_link: invite, reward, budget_slots: slots,
+        channel_id: ref,
       });
       toast(`✅ Task submitted for review — ${fmt(r.total_cost)} Birr escrowed`);
       refreshMe(); onDone();
     } catch (e: any) {
       const msgs: Record<string, string> = {
         insufficient_balance: "❌ Insufficient balance for that budget",
-        reward_out_of_range: `Reward must be ${cfg.min_reward}–${cfg.max_reward} Birr`,
-        slots_out_of_range: `Slots must be ${cfg.min_slots}–${cfg.max_slots}`,
-        invalid_link: "Link must be a t.me link", missing_fields: "Fill in title and link",
+        invalid_link: "Link must be a t.me link", missing_fields: "Paste your channel link",
       };
       toast(msgs[e?.message] || e?.message || "Create failed");
     }
     setBusy(false);
   }
 
-  if (step === 1) {
-    return (
-      <div className="card">
-        <div style={{ fontWeight: 800, marginBottom: 6 }}>Step 1 — Your channel (optional)</div>
-        <div className="s" style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>
-          Add <b>@{cfg.bot_username}</b> as an admin in your channel, then paste its @username or ID.
-          Verified channels get real membership checks; skip to create a wait-timer task instead.
-        </div>
-        <div style={{ height: 10 }} />
-        <input placeholder="@yourchannel or -100…" value={channelId} onChange={(e) => setChannelId(e.target.value)} />
-        <button className="btn" disabled={busy} onClick={verify}>{busy ? <><Spinner />Checking…</> : "Check & Continue"}</button>
-        <button className="btn ghost" onClick={() => { setVerified(false); setStep(2); }}>Skip — no channel check</button>
-      </div>
-    );
-  }
-  const total = (Number(reward) || 0) * (Number(slots) || 0);
   return (
     <div className="card">
-      <div style={{ fontWeight: 800, marginBottom: 6 }}>
-        Step 2 — Task details {verified ? "✅ (membership will be verified)" : "(wait-timer task)"}
+      <div style={{ fontWeight: 800, marginBottom: 6 }}>➕ Create a task</div>
+      <div className="s" style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>
+        Add <b>@{cfg.bot_username}</b> as an admin in your channel, then paste the channel link.
       </div>
-      <label className="f">Title</label>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Join my channel" />
-      <label className="f">Invite link</label>
-      <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://t.me/yourchannel" />
-      <label className="f">Reward per person (Birr) — {cfg.min_reward}…{cfg.max_reward}</label>
-      <input type="number" value={reward} onChange={(e) => setReward(e.target.value)} />
-      <label className="f">People (slots) — {cfg.min_slots}…{cfg.max_slots}</label>
-      <input type="number" value={slots} onChange={(e) => setSlots(e.target.value)} />
-      <div className="s" style={{ color: "var(--muted)", fontSize: 13 }}>Total escrow from your balance: <b>{fmt(total)} Birr</b> (unused slots are refunded on cancel)</div>
-      <button className="btn" disabled={busy} onClick={create}>{busy ? <><Spinner />Creating…</> : "Create Task"}</button>
-      <button className="btn ghost" onClick={() => setStep(1)}>← Back</button>
+      <div style={{ height: 10 }} />
+      <input placeholder="https://t.me/yourchannel" value={link} onChange={(e) => setLink(e.target.value)} />
+      <div className="s" style={{ color: "var(--muted)", fontSize: 13 }}>
+        Total from your balance: <b>{fmt(total)} Birr</b> ({fmt(reward)} Birr × {slots} people)
+      </div>
+      <button className="btn" disabled={busy} onClick={create}>{busy ? <><Spinner />Checking…</> : "Verify & Create"}</button>
     </div>
   );
 }
