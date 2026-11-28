@@ -5609,6 +5609,21 @@ async def health_check():
     return {"ok": True}
 
 
+@api_app.get("/logo.png")
+async def logo_png():
+    # The bot's logo for the /verify page brand block (owner request
+    # 2026-11-28: the verification page must show the logo image together
+    # with its text). Serves the small 256px variant; the full-size
+    # assets/logo.png stays the BotFather/bot-chat asset.
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        Path(__file__).parent / "assets" / "logo-256.png",
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @api_app.get("/verify")
 async def verify_page():
     # The standalone "Security Check" page (legacy index.html, restored in
