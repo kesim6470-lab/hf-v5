@@ -64,7 +64,20 @@ export default function App() {
   // (when it applies) is already known at first paint — no dashboard
   // flash followed by a banner popping in.
   useEffect(() => {
-    Promise.all([refreshMe(), fetchGate()]).finally(() => setBooted(true));
+    // Prefetch the main screens' data in the SAME parallel batch
+    // (owner order 2026-11-28: "real loading" at the door — the app
+    // opens with its data ready instead of each screen spinning on
+    // its own). These are 40s-cached reads, so Home/Tasks/Top render
+    // instantly from cache at first paint. Failures are swallowed:
+    // a screen whose prefetch missed simply loads normally.
+    const prefetch = Promise.all([
+      api("/api/tasks").catch(() => null),
+      api("/api/tasks/mine").catch(() => null),
+      api("/api/leaderboard").catch(() => null),
+      api("/api/dailycheck/status").catch(() => null),
+      api("/api/withdrawals/recent").catch(() => null),
+    ]);
+    Promise.all([refreshMe(), fetchGate(), prefetch]).finally(() => setBooted(true));
   }, [refreshMe, fetchGate]);
 
   // Re-check the gate whenever the app returns to the foreground —
@@ -166,6 +179,7 @@ export default function App() {
       <main>
         {gateError === "not_verified" ? (
           <div className="card" style={{ marginTop: 18 }}>
+            <img src="/logo.png" alt="Anon Earn" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", display: "block", margin: "2px auto 10px" }} />
             <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>🛡️ Verification needed</div>
             <div style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.55 }}>
               This account hasn't completed the one-time security check yet.
