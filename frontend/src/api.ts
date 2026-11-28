@@ -28,6 +28,10 @@ export class ApiError extends Error {
   }
 }
 
+// Owner order 2026-11-28: a network failure must never surface the
+// browser's raw "Failed to fetch" — the user sees this instead.
+export const NETWORK_ERROR_MSG = "📶 Check your network connection and try again";
+
 /* 15-second read cache (owner request 2026-11-26): switching between
    screens re-mounts them and would otherwise re-ask the server for the
    same data every few seconds — congestion + stutter. Read-style
@@ -70,15 +74,20 @@ export async function api<T = any>(path: string, body: Record<string, any> = {})
   let data: any;
   if (path === "/api/withdrawals/recent") {
     // The public ticker is a plain GET in the backend (no initData).
-    const res = await fetch(`${API_BASE}${path}`);
+    let res: Response;
+    try { res = await fetch(`${API_BASE}${path}`); }
+    catch { throw new ApiError(0, NETWORK_ERROR_MSG); }
     if (!res.ok) throw new ApiError(res.status, res.statusText);
     data = await res.json();
   } else {
-    const r = await fetch(API_BASE + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData, ...body }),
-    });
+    let r: Response;
+    try {
+      r = await fetch(API_BASE + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData, ...body }),
+      });
+    } catch { throw new ApiError(0, NETWORK_ERROR_MSG); }
     try { data = await r.json(); } catch { data = null; /* non-JSON */ }
     if (!r.ok) throw new ApiError(r.status, (data && data.detail) || `http_${r.status}`);
   }
