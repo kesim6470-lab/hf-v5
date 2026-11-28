@@ -3036,16 +3036,18 @@ def invite_share_text(link: str, show_binance: bool = True) -> str:
     gold-coin brand line, earn-loop lines, payout line, link last.
     show_binance=False (admin setting invite_show_binance) drops
     Binance Pay from the payout line, leaving Telebirr only."""
-    payout = ("Payouts go to Telebirr or Binance Pay.\n\n" if show_binance
-              else "Payouts go to Telebirr.\n\n")
+    payout = ("💸 Withdraw your earnings straight to Telebirr or Binance Pay.\n\n"
+              if show_binance
+              else "💸 Withdraw your earnings straight to Telebirr.\n\n")
     return (
-        "🪙 ANON EARN — Birr, little by little, every day.\n\n"
-        "🎬 clips I watch turn into Birr\n"
-        "🎯 small missions, quick rewards\n"
-        "🔥 a daily streak that keeps paying\n"
-        "👥 friends I bring in earn me more\n\n"
+        "🪙 ANON EARN — Earn Birr, one step at a time.\n\n"
+        "🎬 Watch videos and earn rewards.\n"
+        "🎯 Complete simple tasks for extra Birr.\n"
+        "🔥 Keep your daily streak going.\n"
+        "👥 Invite friends and earn referral rewards.\n"
+        "🏆 Climb the Weekly Top 20 and win bonuses.\n\n"
         f"{payout}"
-        "Your turn — start free 👇\n"
+        "Ready to get started? Join now 👇\n"
         f"{link}"
     )
 
@@ -3053,16 +3055,18 @@ def invite_share_text(link: str, show_binance: bool = True) -> str:
 def invite_card_caption(show_binance: bool = True) -> str:
     """HTML twin of invite_share_text() for the invite CARD (photo +
     caption + Join button) sent via the inline picker / share_card."""
-    payout = ("Payouts go to <b>Telebirr</b> or <b>Binance Pay</b>.\n\n"
-              if show_binance else "Payouts go to <b>Telebirr</b>.\n\n")
+    payout = ("💸 Withdraw your earnings straight to <b>Telebirr</b> or <b>Binance Pay</b>.\n\n"
+              if show_binance
+              else "💸 Withdraw your earnings straight to <b>Telebirr</b>.\n\n")
     return (
-        "🪙 <b>ANON EARN — Birr, little by little, every day.</b>\n\n"
-        "🎬 clips I watch turn into Birr\n"
-        "🎯 small missions, quick rewards\n"
-        "🔥 a daily streak that keeps paying\n"
-        "👥 friends I bring in earn me more\n\n"
+        "🪙 <b>ANON EARN — Earn Birr, one step at a time.</b>\n\n"
+        "🎬 Watch videos and earn rewards.\n"
+        "🎯 Complete simple tasks for extra Birr.\n"
+        "🔥 Keep your daily streak going.\n"
+        "👥 Invite friends and earn referral rewards.\n"
+        "🏆 Climb the Weekly Top 20 and win bonuses.\n\n"
         f"{payout}"
-        "Tap below and start free — it takes a minute 👇"
+        "Ready to get started? Join now 👇"
     )
 
 
@@ -3072,7 +3076,7 @@ async def _build_invite_card(uid: int):
     show_binance = (await DataEngine.get_setting("invite_show_binance", "0")) == "1"
     caption = invite_card_caption(show_binance)
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🪙 Start on Anon Earn — Free", url=referral_link)],
+        [InlineKeyboardButton(text="🪙 Start on Anon Earn", url=referral_link)],
     ])
     photo_id = await _get_bot_photo_file_id()
     return caption, kb, photo_id
