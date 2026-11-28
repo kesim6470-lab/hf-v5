@@ -1084,14 +1084,30 @@ class DataEngine:
             if prize <= 0 or r["user_id"] <= 0:
                 continue
             async with aiosqlite.connect(DB_PATH) as db:
-                cur = await db.execute(
-                    "INSERT OR IGNORE INTO weekly_top_payouts "
-                    "(week_id, user_id, rank, refs, amount) VALUES (?,?,?,?,?)",
-                    (prev_id, r["user_id"], rank, r["refs"], prize))
-                await db.commit()
-                claimed = cur.rowcount > 0
+                await db.execute("BEGIN EXCLUSIVE")
+                try:
+                    cur = await db.execute(
+                        "INSERT OR IGNORE INTO weekly_top_payouts "
+                        "(week_id, user_id, rank, refs, amount) VALUES (?,?,?,?,?)",
+                        (prev_id, r["user_id"], rank, r["refs"], prize))
+                    claimed = cur.rowcount > 0
+                    if claimed:
+                        # W-3 fix (audit 2026-11-28): credit in the SAME
+                        # transaction as the payout row. Before, the row
+                        # committed first and the credit happened in a
+                        # separate step — a crash/redeploy in between
+                        # lost the prize forever (row exists → the week
+                        # is never retried). Double-pay stays impossible:
+                        # UNIQUE(week_id, user_id) + INSERT OR IGNORE.
+                        await db.execute(
+                            "UPDATE users SET balance = ROUND(balance + ?, 2) "
+                            "WHERE user_id = ?",
+                            (prize, r["user_id"]))
+                    await db.execute("COMMIT")
+                except Exception:
+                    await db.execute("ROLLBACK")
+                    raise
             if claimed:
-                await DataEngine.add_balance(r["user_id"], prize)
                 paid += 1
         await DataEngine.set_setting("weekly_top_last_paid", prev_id)
         logger.info(f"Weekly Top payout for {prev_id}: {paid} winners paid")
@@ -4053,6 +4069,14 @@ async def dispatch_withdrawal_core(
     """
     is_binance = method == "binance"
 
+    # WD-1 fix (audit 2026-11-28): the method on/off switches were only
+    # enforced in /api/withdraw, so the bot-chat flow could still pay
+    # out through a method the admin had disabled. Enforce here, at the
+    # one choke point both flows share.
+    _method_setting = "withdraw_binance_enabled" if is_binance else "withdraw_telebirr_enabled"
+    if (await DataEngine.get_setting(_method_setting, "1")) != "1":
+        return {"status": "error", "reason": "method_disabled"}
+
     # Check balance BEFORE the ads-requirement gate. Otherwise someone who
     # simply doesn't have enough money sees a confusing "watch more ads"
     # message instead of the real reason their request can't go through.
@@ -6832,6 +6856,12 @@ async def api_tasks_join(body: TaskActionRequest):
     task = await DataEngine.get_task(body.task_id)
     if not task or not task["is_active"]:
         raise HTTPException(status_code=404, detail="task_not_found")
+    if task["task_type"] == "manual":
+        # T-1 fix (audit round 5 + 2026-11-28 re-check): manual tasks
+        # are completed ONLY via screenshot submission + admin review.
+        # Letting them through join/check/claim paid the reward with no
+        # review — and again when the screenshot was approved.
+        raise HTTPException(status_code=400, detail="manual_submit_required")
     await _require_force_joined(user["user_id"])
     await DataEngine.mark_task_joined(user["user_id"], body.task_id)
     return {"wait_seconds": TASK_JOIN_WAIT_SECONDS}
@@ -6846,6 +6876,8 @@ async def api_tasks_check(body: TaskActionRequest):
     task = await DataEngine.get_task(body.task_id)
     if not task:
         raise HTTPException(status_code=404, detail="task_not_found")
+    if task["task_type"] == "manual":
+        raise HTTPException(status_code=400, detail="manual_submit_required")
     prog = await DataEngine.get_task_progress(uid, body.task_id)
     if not prog:
         raise HTTPException(status_code=400, detail="not_joined")
@@ -6877,6 +6909,8 @@ async def api_tasks_claim(body: TaskActionRequest):
     task = await DataEngine.get_task(body.task_id)
     if not task:
         raise HTTPException(status_code=404, detail="task_not_found")
+    if task["task_type"] == "manual":
+        raise HTTPException(status_code=400, detail="manual_submit_required")
     prog = await DataEngine.get_task_progress(uid, body.task_id)
     if not prog or prog["status"] == "completed":
         raise HTTPException(status_code=400, detail="not_claimable")
@@ -7084,6 +7118,13 @@ async def api_tasks_create(body: UserTaskCreateRequest):
         try:
             chat = await bot.get_chat(chat_id=channel_id)
             channel_id = str(chat.id)
+            # Bind invite_link to the VERIFIED channel (audit
+            # 2026-11-28): channel_id and invite_link were independent
+            # client inputs, so a creator could send joiners to one
+            # channel while membership was checked against another.
+            # A public channel's link is its username — force it.
+            if getattr(chat, "username", None):
+                link = f"https://t.me/{chat.username}"
         except Exception:
             pass
     if task_type != "force":
@@ -7243,6 +7284,17 @@ async def api_admin_tasks_review(body: AdminTaskReviewRequest):
         try:
             task = await DataEngine.get_task(body.id)
             channel_id = (task["channel_id"] if task else "") or ""
+            if channel_id:
+                # Abuse guard (audit 2026-11-28): post ONLY in a channel
+                # the creator themselves owns or admins. Without this, a
+                # user could aim a task at a sponsor/gate channel (where
+                # the bot is admin by design) and get their personal
+                # invite link posted into it on approval, then cancel
+                # and recover the escrow — free promotion, repeatable.
+                member = await bot.get_chat_member(chat_id=channel_id,
+                                                   user_id=info["created_by"])
+                if member.status not in ("creator", "administrator"):
+                    channel_id = ""
             if channel_id:
                 uname = BOT_USERNAME or (await bot.get_me()).username
                 link = f"https://t.me/{uname}?start={info['created_by']}"
