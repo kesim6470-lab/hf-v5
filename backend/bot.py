@@ -4347,33 +4347,17 @@ async def approve_withdrawal_core(tid: int, notify_mode: str = "both") -> dict:
             f"<b>Anon Earn</b>"
         )
         try:
-            if is_binance:
-                # Binance Pay payouts have no fixed proof image on file —
-                # post as text so we don't attach the Telebirr receipt photo.
-                await bot.send_message(
-                    chat_id=PAYMENT_LOG_CHANNEL,
-                    text=txt,
-                    reply_to_message_id=ticket["channel_post_id"],
-                    reply_markup=proof_channel_keyboard
-                )
-            else:
-                await _send_proof_photo(
-                    PAYMENT_LOG_CHANNEL,
-                    txt,
-                    reply_markup=proof_channel_keyboard,
-                    reply_to_message_id=ticket["channel_post_id"]
-                )
+            # Completed proof is TEXT ONLY (owner order 2026-11-28) — no
+            # proof photo on the paid/reply post, for both methods. The
+            # request post keeps its Telebirr photo.
+            await bot.send_message(
+                chat_id=PAYMENT_LOG_CHANNEL,
+                text=txt,
+                reply_to_message_id=ticket["channel_post_id"],
+                reply_markup=proof_channel_keyboard
+            )
         except Exception as e:
-            logger.error(f"Proof Photo Error: {e}")
-            try:
-                await bot.send_message(
-                    chat_id=PAYMENT_LOG_CHANNEL,
-                    text=txt,
-                    reply_to_message_id=ticket["channel_post_id"],
-                    reply_markup=proof_channel_keyboard
-                )
-            except Exception as e2:
-                logger.error(f"Proof Text Fallback Error: {e2}")
+            logger.error(f"Proof Post Error: {e}")
     if notify_mode != "channel_only":
         try:
             method_txt = "Binance Pay" if is_binance else "Telebirr"
@@ -7587,16 +7571,12 @@ async def api_admin_proofs_manual(body: AdminManualProofRequest):
         f"<b>Anon Earn</b>"
     )
     try:
-        if is_binance:
-            msg = await bot.send_message(
-                PAYMENT_LOG_CHANNEL, txt,
-                reply_to_message_id=body.post_id, reply_markup=kb
-            )
-        else:
-            msg = await _send_proof_photo(
-                PAYMENT_LOG_CHANNEL, txt,
-                reply_markup=kb, reply_to_message_id=body.post_id
-            )
+        # Completed proof is TEXT ONLY (owner order 2026-11-28) — no image
+        # on the paid/reply post.
+        msg = await bot.send_message(
+            PAYMENT_LOG_CHANNEL, txt,
+            reply_to_message_id=body.post_id, reply_markup=kb
+        )
     except Exception as e:
         logger.error(f"Manual Proof Post Error: {e}")
         raise HTTPException(status_code=502, detail="post_failed")
