@@ -97,6 +97,8 @@ body::after{
 .bar-fill.s-ok{background:linear-gradient(90deg,#0d9668,#2ee6a8);box-shadow:0 0 12px rgba(46,230,168,.5);width:100%!important;}
 .bar-fill.s-err{background:linear-gradient(90deg,#be3455,#fb7185);box-shadow:0 0 12px rgba(251,113,133,.5);width:100%!important;}
 .brand{display:flex;flex-direction:column;align-items:center;gap:9px;margin-bottom:18px;}
+.brand-logo{width:72px;height:72px;border-radius:50%;object-fit:cover;
+  border:2px solid rgba(255,233,168,.75);box-shadow:0 8px 26px rgba(245,197,66,.35);}
 .brand-coin{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.45rem;color:#3a2a05;
   background:radial-gradient(circle at 32% 30%,#ffe9a8,#f5c542 55%,#c8890a);
@@ -168,7 +170,7 @@ body::after{
 </head>
 <body>
 <div class="card">
-  <div class="brand"><div class="brand-coin">A</div><div class="brand-name">ANON EARN</div></div>
+  <div class="brand"><img class="brand-logo" src="/logo.png" alt="Anon Earn logo" /><div class="brand-name">ANON EARN</div></div>
   <div class="icon-zone" id="iconZone">
     <div class="spin-ring"></div>
     <div class="icon-bg"></div>
