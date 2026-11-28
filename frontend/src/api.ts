@@ -36,7 +36,12 @@ export class ApiError extends Error {
    state is never stale after something changes. */
 const READ_PATHS = new Set([
   "/api/me", "/api/tasks", "/api/tasks/mine", "/api/leaderboard",
-  "/api/ads/status", "/api/dailycheck/status",
+  "/api/dailycheck/status",
+  // NOTE: /api/ads/status is NOT cached either (fix 2026-11-28, audit
+  // F-1): the ad-confirm poll (Home pollConfirmed, 12×2s) must see the
+  // AdsGram S2S credit the moment it lands — a cached pre-credit
+  // snapshot made users see "Couldn't confirm" for a credit that had
+  // actually arrived.
   // NOTE: /api/gate/status is not in the 40s read cache — the gate runs
   // on a 5-minute cycle instead (App.tsx interval + the backend's own
   // 5-minute per-user OK cache), so membership is re-verified regularly
