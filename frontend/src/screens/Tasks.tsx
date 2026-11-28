@@ -11,9 +11,9 @@ const TASK_ICON = "/task-icon.png";
 
 /** Tasks: join → wait → check → claim for auto tasks; screenshot upload
  *  for manual tasks; My Tasks (escrow status + cancel/refund); and the
- *  Create-Task form (owner-simplified 2026-11-28: link field +
- *  bot-admin verify, user-chosen reward/people, total shown up
- *  front), gated by the backend's user_task_config. */
+ *  Create-Task form (owner-simplified 2026-11-28: STEP flow —
+ *  Step 1 link + bot-admin verify only, Step 2 reward/people +
+ *  total), gated by the backend's user_task_config. */
 export default function Tasks() {
   const { toast, refreshMe } = useApp();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -298,15 +298,18 @@ export default function Tasks() {
 
 function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
   const { toast, refreshMe } = useApp();
+  const [step, setStep] = useState(1);
   const [link, setLink] = useState("");
+  const [ref, setRef] = useState("");
+  const [chanTitle, setChanTitle] = useState("");
   const [reward, setReward] = useState(String(cfg.min_reward ?? 1));
   const [slots, setSlots] = useState(String(cfg.min_slots ?? 5));
   const [busy, setBusy] = useState(false);
 
-  // Owner order 2026-11-28: link + verify is the core of the form;
-  // the user still chooses reward per person and how many people,
-  // sees the total needed up front, and the task title comes back
-  // from the bot-admin check itself.
+  // Owner order 2026-11-28: STEP flow — Step 1 is the channel link
+  // + bot-admin verify ONLY; once verified, Step 2 opens with the
+  // reward-per-person and how-many-people fields and the total.
+  // The task title comes back from the bot-admin check itself.
   const total = (Number(reward) || 0) * (Number(slots) || 0);
 
   function channelRef(raw: string): string {
@@ -316,24 +319,34 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
     return s; // numeric -100… id pasted directly
   }
 
-  async function create() {
+  async function verify() {
     if (link.includes("t.me/+") || link.includes("joinchat")) {
       toast("Use your channel's public link or @username");
       return;
     }
-    const ref = channelRef(link);
-    if (!ref) { toast("Paste your channel link"); return; }
+    const r = channelRef(link);
+    if (!r) { toast("Paste your channel link"); return; }
     setBusy(true);
     try {
-      const v = await api<{ is_admin: boolean; title: string | null }>("/api/tasks/verify_admin", { channel_id: ref });
+      const v = await api<{ is_admin: boolean; title: string | null }>("/api/tasks/verify_admin", { channel_id: r });
       if (!v.is_admin) {
         toast(`❌ Add @${cfg.bot_username} as an admin in your channel first`);
         setBusy(false);
         return;
       }
+      setRef(r);
+      setChanTitle(v.title || r);
+      setStep(2);
+    } catch (e: any) { toast(e?.message || "Verify failed"); }
+    setBusy(false);
+  }
+
+  async function create() {
+    setBusy(true);
+    try {
       const invite = ref.startsWith("@") ? `https://t.me/${ref.slice(1)}` : link.trim();
       const r = await api<{ total_cost: number }>("/api/tasks/create", {
-        title: v.title || ref, invite_link: invite, reward: Number(reward), budget_slots: Number(slots),
+        title: chanTitle, invite_link: invite, reward: Number(reward), budget_slots: Number(slots),
         channel_id: ref,
       });
       toast(`✅ Task submitted for review — ${fmt(r.total_cost)} Birr escrowed`);
@@ -350,14 +363,22 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
     setBusy(false);
   }
 
+  if (step === 1) {
+    return (
+      <div className="card">
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>➕ Create a task — Step 1</div>
+        <div className="s" style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>
+          Add <b>@{cfg.bot_username}</b> as an admin in your channel, then paste the channel link.
+        </div>
+        <div style={{ height: 10 }} />
+        <input placeholder="https://t.me/yourchannel" value={link} onChange={(e) => setLink(e.target.value)} />
+        <button className="btn" disabled={busy} onClick={verify}>{busy ? <><Spinner />Checking…</> : "Verify"}</button>
+      </div>
+    );
+  }
   return (
     <div className="card">
-      <div style={{ fontWeight: 800, marginBottom: 6 }}>➕ Create a task</div>
-      <div className="s" style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>
-        Add <b>@{cfg.bot_username}</b> as an admin in your channel, then paste the channel link.
-      </div>
-      <div style={{ height: 10 }} />
-      <input placeholder="https://t.me/yourchannel" value={link} onChange={(e) => setLink(e.target.value)} />
+      <div style={{ fontWeight: 800, marginBottom: 6 }}>Step 2 — ✅ {chanTitle}</div>
       <label className="f">Reward per person (Birr) — {cfg.min_reward}…{cfg.max_reward}</label>
       <input type="number" value={reward} onChange={(e) => setReward(e.target.value)} />
       <label className="f">How many people — {cfg.min_slots}…{cfg.max_slots}</label>
@@ -365,7 +386,8 @@ function CreateWizard({ cfg, onDone }: { cfg: any; onDone: () => void }) {
       <div className="s" style={{ color: "var(--muted)", fontSize: 13 }}>
         Total needed: <b>{fmt(total)} Birr</b> from your balance
       </div>
-      <button className="btn" disabled={busy} onClick={create}>{busy ? <><Spinner />Checking…</> : "Verify & Create"}</button>
+      <button className="btn" disabled={busy} onClick={create}>{busy ? <><Spinner />Creating…</> : "Create Task"}</button>
+      <button className="btn ghost" onClick={() => setStep(1)}>← Back</button>
     </div>
   );
 }
